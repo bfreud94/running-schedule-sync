@@ -93,7 +93,9 @@ function addDescriptionToStravaActivity(activity, accessToken) {
   const detailedActivity = fetchDetailedStravaActivity(activity.id, accessToken);
   return {
     ...activity,
-    description: detailedActivity ? detailedActivity.description ?? null : null
+    description: detailedActivity && detailedActivity.description != null
+      ? detailedActivity.description
+      : null
   };
 }
 

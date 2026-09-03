@@ -127,7 +127,7 @@ function ensureInjuryReportWeek(sheet, sheetData, weekStart) {
     if (rowIndex === -1) rowIndex = sheetData.length;
 
     sheet.getRange(rowIndex + 1, 1).setValue(date).setNumberFormat('mmmm d');
-    sheetData[rowIndex] ||= [];
+    if (!sheetData[rowIndex]) sheetData[rowIndex] = [];
     sheetData[rowIndex][0] = date;
     existingDateKeys.add(dateKey);
   });
@@ -140,7 +140,7 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
   const headers = [...sheetData[0]];
   const activitiesByDate = activities.filter(isRunningActivity).reduce((groups, activity) => {
     const dateKey = getDateKey(parseActivityDate(activity));
-    groups[dateKey] ||= [];
+    if (!groups[dateKey]) groups[dateKey] = [];
     groups[dateKey].push(activity);
     return groups;
   }, {});
@@ -180,7 +180,7 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
       getSeverityColor(rowSeverity)
     );
 
-    if (reports.length === 0 && activitiesByDate[dateKey]?.length) {
+    if (reports.length === 0 && activitiesByDate[dateKey] && activitiesByDate[dateKey].length) {
       setInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'No injuries reported');
     } else if (reports.length === 0) {
       setInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'Rest day');
