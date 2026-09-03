@@ -1,0 +1,7 @@
+{
+  "name": "running-schedule-sync",
+  "private": true,
+  "scripts": {
+    "push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./push.ps1"
+  }
+}

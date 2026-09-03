@@ -4,6 +4,8 @@
 .clasp.json
 .claspignore
 run-local.js
+push.ps1
+package.json
 *.test.js
 local/**
 fixtures/**
