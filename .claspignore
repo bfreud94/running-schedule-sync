@@ -1,0 +1,10 @@
+.env
+.git/**
+.gitignore
+.clasp.json
+.claspignore
+run-local.js
+*.test.js
+local/**
+fixtures/**
+output/**
