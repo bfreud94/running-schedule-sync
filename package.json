@@ -2,6 +2,8 @@
   "name": "running-schedule-sync",
   "private": true,
   "scripts": {
+    "test": "node --test",
+    "setup-hooks": "git config core.hooksPath .githooks",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./push.ps1"
   }
 }

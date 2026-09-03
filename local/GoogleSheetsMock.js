@@ -47,6 +47,18 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             sheet.styles[`${row},${column}`].numberFormat = value;
             changes.push({ sheet: name, row, column, property: 'numberFormat', value });
             return this;
+          },
+          setWrap(value) {
+            sheet.styles[`${row},${column}`] ||= {};
+            sheet.styles[`${row},${column}`].wrap = value;
+            changes.push({ sheet: name, row, column, property: 'wrap', value });
+            return this;
+          },
+          setVerticalAlignment(value) {
+            sheet.styles[`${row},${column}`] ||= {};
+            sheet.styles[`${row},${column}`].verticalAlignment = value;
+            changes.push({ sheet: name, row, column, property: 'verticalAlignment', value });
+            return this;
           }
         };
       }
@@ -63,9 +75,18 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
     });
   }
 
+  function insertSheet(name) {
+    workbook.sheets[name] = { values: [], styles: {} };
+    changes.push({ sheet: name, property: 'created' });
+    return getSheet(name);
+  }
+
   return {
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({ getSheetByName: getSheet }),
+      getActiveSpreadsheet: () => ({
+        getSheetByName: getSheet,
+        insertSheet
+      }),
       flush: recalculateTotals
     },
     save() {

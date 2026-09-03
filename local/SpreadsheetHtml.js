@@ -28,7 +28,9 @@ function renderSheet(name, sheet, changes) {
       const style = sheet.styles?.[key] || {};
       const inlineStyle = [
         style.background ? `background:${style.background}` : '',
-        style.fontColor ? `color:${style.fontColor}` : ''
+        style.fontColor ? `color:${style.fontColor}` : '',
+        style.wrap ? 'white-space:pre-wrap' : '',
+        style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : ''
       ].filter(Boolean).join(';');
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       return `<td${changedClass} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;

@@ -1,5 +1,6 @@
 .env
 .git/**
+.githooks/**
 .gitignore
 .clasp.json
 .claspignore

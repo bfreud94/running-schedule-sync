@@ -5,7 +5,7 @@ function syncStravaToActualRuns() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const actualSheet = spreadsheet.getSheetByName(ACTUAL_SHEET_NAME);
   const plannedSheet = spreadsheet.getSheetByName(PLANNED_SHEET_NAME);
-  const injuryReportSheet = spreadsheet.getSheetByName(getInjuryReportSheetName());
+  const injuryReportSheet = getOrCreateInjuryReportSheet(spreadsheet);
 
   if (!actualSheet) {
     Logger.log(`Error: Sheet named "${ACTUAL_SHEET_NAME}" was not found.`);
@@ -32,9 +32,7 @@ function syncStravaToActualRuns() {
   const dailyMiles = calculateDailyRunMiles(activities, targetMonday);
 
   updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, todayOffset);
-  if (injuryReportSheet) {
-    updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
-  }
+  updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
 
   SpreadsheetApp.flush();
   const actualTotalMiles = updateTotalCell(actualSheet, targetRowIndex, plannedRow);

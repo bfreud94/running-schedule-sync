@@ -2,6 +2,11 @@ function getInjuryReportSheetName(date = new Date()) {
   return `${date.getFullYear()} Injury Report`;
 }
 
+function getOrCreateInjuryReportSheet(spreadsheet, date = new Date()) {
+  const sheetName = getInjuryReportSheetName(date);
+  return spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
+}
+
 function parseInjuryReport(description) {
   const match = String(description || '').match(/injury report:?\s*\r?\n\s*([^:\r\n]+)\s*:\s*([\s\S]*)/i);
   if (!match) return null;
@@ -104,6 +109,21 @@ function clearInjuryRowBackground(sheet, rowIndex, lastHeaderColumnIndex) {
   highlightInjuryRow(sheet, rowIndex, lastHeaderColumnIndex, null);
 }
 
+function clearFutureInjuryRow(sheet, rowIndex, lastHeaderColumnIndex) {
+  clearInjuryRowBackground(sheet, rowIndex, lastHeaderColumnIndex);
+  setInjuryRowValues(sheet, rowIndex, lastHeaderColumnIndex, '');
+}
+
+function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+    for (let columnIndex = 0; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
+      sheet.getRange(rowIndex + 1, columnIndex + 1)
+        .setWrap(true)
+        .setVerticalAlignment('middle');
+    }
+  }
+}
+
 function ensureInjuryReportWeek(sheet, sheetData, weekStart) {
   if (!sheetData[0]) sheetData[0] = [];
 
@@ -166,8 +186,8 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
       return;
     }
 
-    if (activityDate > currentDate) {
-      clearInjuryRowBackground(sheet, rowIndex, getLastHeaderColumnIndex(headers));
+    if (getDateKey(activityDate) > getDateKey(currentDate)) {
+      clearFutureInjuryRow(sheet, rowIndex, getLastHeaderColumnIndex(headers));
       return;
     }
 
@@ -193,4 +213,6 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
         .setBackground(getSeverityColor(report.severity));
     });
   });
+
+  formatInjuryReportCells(sheet, sheetData.length, getLastHeaderColumnIndex(headers));
 }

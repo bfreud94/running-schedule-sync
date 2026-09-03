@@ -69,13 +69,17 @@ test('row highlighting includes the date and every body-part column', () => {
   });
 });
 
-test('clearing a future row removes backgrounds from every populated column', () => {
+test('clearing a future row removes backgrounds and values from body-part cells', () => {
   const backgrounds = {};
+  const values = {};
   const sheet = {
     getRange(row, column) {
       return {
         setBackground(value) {
           backgrounds[`${row},${column}`] = value;
+        },
+        setValue(value) {
+          values[`${row},${column}`] = value;
         }
       };
     }
@@ -83,13 +87,17 @@ test('clearing a future row removes backgrounds from every populated column', ()
   const context = vm.createContext({ console });
   const source = readFileSync('InjuryReport.js', 'utf8');
 
-  vm.runInContext(`${source}\nglobalThis.clearTarget = clearInjuryRowBackground;`, context);
+  vm.runInContext(`${source}\nglobalThis.clearTarget = clearFutureInjuryRow;`, context);
   context.clearTarget(sheet, 5, 2);
 
   assert.deepEqual(backgrounds, {
     '6,1': null,
     '6,2': null,
     '6,3': null
+  });
+  assert.deepEqual(values, {
+    '6,2': '',
+    '6,3': ''
   });
 });
 
