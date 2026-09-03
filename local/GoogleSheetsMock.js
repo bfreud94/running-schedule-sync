@@ -11,8 +11,13 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
     if (!sheet) return null;
 
     sheet.styles ||= {};
+    sheet.columnWidths ||= {};
 
     return {
+      setColumnWidth(column, width) {
+        sheet.columnWidths[column] = width;
+        changes.push({ sheet: name, column, property: 'columnWidth', value: width });
+      },
       getDataRange: () => ({
         getValues: () => sheet.values.map(row => [...row])
       }),
@@ -58,6 +63,12 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             sheet.styles[`${row},${column}`] ||= {};
             sheet.styles[`${row},${column}`].verticalAlignment = value;
             changes.push({ sheet: name, row, column, property: 'verticalAlignment', value });
+            return this;
+          },
+          setHorizontalAlignment(value) {
+            sheet.styles[`${row},${column}`] ||= {};
+            sheet.styles[`${row},${column}`].horizontalAlignment = value;
+            changes.push({ sheet: name, row, column, property: 'horizontalAlignment', value });
             return this;
           }
         };

@@ -117,10 +117,16 @@ function clearFutureInjuryRow(sheet, rowIndex, lastHeaderColumnIndex) {
 function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
   for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
     for (let columnIndex = 0; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
-      sheet.getRange(rowIndex + 1, columnIndex + 1)
+      const cell = sheet.getRange(rowIndex + 1, columnIndex + 1)
         .setWrap(true)
         .setVerticalAlignment('middle');
+
+      if (columnIndex === 0) cell.setHorizontalAlignment('left');
     }
+  }
+
+  for (let columnIndex = 1; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
+    sheet.setColumnWidth(columnIndex + 1, 200);
   }
 }
 

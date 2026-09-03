@@ -30,7 +30,8 @@ function renderSheet(name, sheet, changes) {
         style.background ? `background:${style.background}` : '',
         style.fontColor ? `color:${style.fontColor}` : '',
         style.wrap ? 'white-space:pre-wrap' : '',
-        style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : ''
+        style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : '',
+        style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : ''
       ].filter(Boolean).join(';');
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       return `<td${changedClass} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;
@@ -44,6 +45,7 @@ function renderSheet(name, sheet, changes) {
       <h2>${escapeHtml(name)}</h2>
       <div class="table-scroll">
         <table>
+          <colgroup><col class="row-number-column">${columns.map((_, index) => `<col style="width:${sheet.columnWidths?.[index + 1] || 100}px">`).join('')}</colgroup>
           <thead><tr><th class="corner"></th>${columns.map(column => `<th>${column}</th>`).join('')}</tr></thead>
           <tbody>${rows}</tbody>
         </table>

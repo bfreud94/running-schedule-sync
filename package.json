@@ -4,6 +4,7 @@
   "scripts": {
     "test": "node --test",
     "setup-hooks": "git config core.hooksPath .githooks",
+    "local": "node ./run-local.js syncStravaToActualRuns --sheet-fixture ./fixtures/spreadsheet.json",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./push.ps1"
   }
 }
