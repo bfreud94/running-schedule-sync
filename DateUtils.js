@@ -45,9 +45,15 @@ function areSameDate(left, right) {
   return left && right && left.getTime() === right.getTime();
 }
 
+function getStartOfDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
 function getDayOffset(date, weekStart) {
   const millisecondsPerDay = 24 * 60 * 60 * 1000;
-  return Math.round((date.getTime() - weekStart.getTime()) / millisecondsPerDay);
+  const normalizedDate = getStartOfDay(date);
+  const normalizedWeekStart = getStartOfDay(weekStart);
+  return Math.round((normalizedDate.getTime() - normalizedWeekStart.getTime()) / millisecondsPerDay);
 }
 
 function parseActivityDate(activity) {
