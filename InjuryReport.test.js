@@ -138,3 +138,27 @@ test('status text is written in every body-part cell', () => {
     '2,3': 'Rest day'
   });
 });
+
+test('fills blank body-part cells when another area has an injury', () => {
+  const values = { '2,2': '', '2,3': '' };
+  const sheet = {
+    getRange(row, column) {
+      return {
+        getValue: () => values[`${row},${column}`],
+        setValue(value) {
+          values[`${row},${column}`] = value;
+        }
+      };
+    }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.blankTarget = setBlankInjuryRowValues;`, context);
+  context.blankTarget(sheet, 1, 2, 'No injuries reported');
+
+  assert.deepEqual(values, {
+    '2,2': 'No injuries reported',
+    '2,3': 'No injuries reported'
+  });
+});

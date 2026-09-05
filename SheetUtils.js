@@ -43,12 +43,13 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const existingValue = String(targetCell.getValue() || '').replace(/\u00A0/g, ' ').trim();
     const isRest = isRestValue(existingValue);
-    const canUpdate = dayIndex === todayOffset || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [');
+    const workoutText = dailyWorkouts[dayIndex].join('\n');
+    const needsWorkoutBackfill = workoutText && !existingValue.includes(workoutText);
+    const canUpdate = dayIndex === todayOffset || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [') || needsWorkoutBackfill;
 
     if (!canUpdate) continue;
 
     const stravaMiles = Math.floor(dailyMiles[dayIndex] * 100) / 100;
-    const workoutText = dailyWorkouts[dayIndex].join('\n');
     const milesText = stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`;
     targetCell.setValue(workoutText ? `${milesText}\n${workoutText}` : milesText);
 

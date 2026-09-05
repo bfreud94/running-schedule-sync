@@ -24,6 +24,27 @@ test('adds workout text after the daily miles value', () => {
   assert.equal(writtenValue, '5 miles\n10 min easy');
 });
 
+test('backfills workout text into an existing miles cell', () => {
+  let writtenValue;
+  const sheet = {
+    getRange() {
+      return {
+        getValue: () => '6.21 miles',
+        setValue: value => { writtenValue = value; },
+        setBackground: () => {},
+        setFontColor: () => {}
+      };
+    }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('SheetUtils.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.updateTarget = updateDailyCells;`, context);
+  context.updateTarget(sheet, 0, null, [6.21, 6.21], [[], ['1000m repeats']], 1);
+
+  assert.equal(writtenValue, '6.21 miles\n1000m repeats');
+});
+
 test('finds the planned row by week instead of row position', () => {
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');

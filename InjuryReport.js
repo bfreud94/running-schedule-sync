@@ -105,6 +105,13 @@ function setInjuryRowValues(sheet, rowIndex, lastHeaderColumnIndex, value) {
   }
 }
 
+function setBlankInjuryRowValues(sheet, rowIndex, lastHeaderColumnIndex, value) {
+  for (let columnIndex = 1; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
+    const cell = sheet.getRange(rowIndex + 1, columnIndex + 1);
+    if (String(cell.getValue() || '').trim() === '') cell.setValue(value);
+  }
+}
+
 function clearInjuryRowBackground(sheet, rowIndex, lastHeaderColumnIndex) {
   highlightInjuryRow(sheet, rowIndex, lastHeaderColumnIndex, null);
 }
@@ -206,7 +213,9 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
       getSeverityColor(rowSeverity)
     );
 
-    if (reports.length === 0 && activitiesByDate[dateKey] && activitiesByDate[dateKey].length) {
+    if (reports.length > 0) {
+      setBlankInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'No injuries reported');
+    } else if (activitiesByDate[dateKey] && activitiesByDate[dateKey].length) {
       setInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'No injuries reported');
     } else if (reports.length === 0) {
       setInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'Rest day');
