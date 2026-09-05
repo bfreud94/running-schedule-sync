@@ -13,6 +13,25 @@ function isRunningActivity(activity) {
   return activityType.includes('run') || sportType.includes('run');
 }
 
+function parseWorkout(description) {
+  const match = String(description || '').match(/workout:\s*\r?\n([^\r\n]*)/i);
+  return match ? match[1].trim() : '';
+}
+
+function calculateDailyWorkouts(activities, targetMonday) {
+  const dailyWorkouts = [[], [], [], [], [], [], []];
+
+  activities.filter(isRunningActivity).forEach(activity => {
+    const dayOffset = getDayOffset(parseActivityDate(activity), targetMonday);
+    const workout = parseWorkout(activity.description);
+    if (dayOffset >= 0 && dayOffset <= 6 && workout) {
+      dailyWorkouts[dayOffset].push(workout);
+    }
+  });
+
+  return dailyWorkouts;
+}
+
 function calculateDailyRunMiles(activities, targetMonday) {
   const metersToMiles = 1 / 1609.344;
   const dailyMiles = [0, 0, 0, 0, 0, 0, 0];

@@ -26,12 +26,14 @@ function syncStravaToActualRuns() {
   Logger.log(`Targeting current week row at index ${targetRowIndex + 1}`);
 
   const plannedData = plannedSheet ? plannedSheet.getDataRange().getValues() : [];
-  const plannedRow = targetRowIndex < plannedData.length ? plannedData[targetRowIndex] : null;
+  const plannedRowIndex = findWeekRowIndex(plannedData, targetMonday);
+  const plannedRow = plannedRowIndex === -1 ? null : plannedData[plannedRowIndex];
   const todayOffset = Math.min(6, Math.max(0, getDayOffset(new Date(), targetMonday)));
   const activities = fetchStravaActivitiesSince(targetMonday);
   const dailyMiles = calculateDailyRunMiles(activities, targetMonday);
+  const dailyWorkouts = calculateDailyWorkouts(activities, targetMonday);
 
-  updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, todayOffset);
+  updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset);
   updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
 
   SpreadsheetApp.flush();

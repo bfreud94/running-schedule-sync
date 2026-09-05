@@ -8,7 +8,7 @@ function getOrCreateInjuryReportSheet(spreadsheet, date = new Date()) {
 }
 
 function parseInjuryReport(description) {
-  const match = String(description || '').match(/injury report:?\s*\r?\n\s*([^:\r\n]+)\s*:\s*([\s\S]*)/i);
+  const match = String(description || '').match(/injury report:?\s*\r?\n\s*area:\s*([^\r\n]+)(?:\r?\n|$)([\s\S]*)/i);
   if (!match) return null;
 
   const bodyPart = match[1].trim();

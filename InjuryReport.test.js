@@ -3,6 +3,21 @@ const { readFileSync } = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
 
+test('parses the body part from the Area line after Injury Report', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReport;`, context);
+
+  const report = context.injuryTarget(
+    'Injury Report:\nArea: Left Groin\nSeverity: 3/10\nTight after workout'
+  );
+  assert.equal(report.bodyPart, 'Left Groin');
+  assert.equal(report.description, 'Severity: 3/10\nTight after workout');
+  assert.equal(report.severity, 3);
+  assert.equal(context.injuryTarget('Injury Report:\nLeft Groin: Tight after workout'), null);
+});
+
 test('new body-part columns copy backgrounds from the previous column', () => {
   const backgrounds = {
     '1,2': '#eeeeee',

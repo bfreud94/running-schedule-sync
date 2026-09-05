@@ -38,7 +38,7 @@ function applyCellStyle(cell, style) {
   cell.setFontColor(style.fontColor);
 }
 
-function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, todayOffset) {
+function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset) {
   for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const existingValue = String(targetCell.getValue() || '').replace(/\u00A0/g, ' ').trim();
@@ -48,7 +48,9 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, todayOf
     if (!canUpdate) continue;
 
     const stravaMiles = Math.floor(dailyMiles[dayIndex] * 100) / 100;
-    targetCell.setValue(stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`);
+    const workoutText = dailyWorkouts[dayIndex].join('\n');
+    const milesText = stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`;
+    targetCell.setValue(workoutText ? `${milesText}\n${workoutText}` : milesText);
 
     if (plannedRow) {
       applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], stravaMiles));
