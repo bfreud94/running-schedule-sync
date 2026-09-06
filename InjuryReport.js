@@ -116,6 +116,13 @@ function clearInjuryRowBackground(sheet, rowIndex, lastHeaderColumnIndex) {
   highlightInjuryRow(sheet, rowIndex, lastHeaderColumnIndex, null);
 }
 
+function setDefaultBodyPartBackgrounds(sheet, rowIndex, lastHeaderColumnIndex) {
+  const noInjuryColor = getSeverityColor(0);
+  for (let columnIndex = 1; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
+    sheet.getRange(rowIndex + 1, columnIndex + 1).setBackground(noInjuryColor);
+  }
+}
+
 function clearFutureInjuryRow(sheet, rowIndex, lastHeaderColumnIndex) {
   clearInjuryRowBackground(sheet, rowIndex, lastHeaderColumnIndex);
   setInjuryRowValues(sheet, rowIndex, lastHeaderColumnIndex, '');
@@ -205,13 +212,8 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
     }
 
     const reports = reportsByDate[dateKey] || [];
-    const rowSeverity = reports.reduce((highest, report) => Math.max(highest, report.severity), 0);
-    highlightInjuryRow(
-      sheet,
-      rowIndex,
-      getLastHeaderColumnIndex(headers),
-      getSeverityColor(rowSeverity)
-    );
+    sheet.getRange(rowIndex + 1, 1).setBackground(null);
+    setDefaultBodyPartBackgrounds(sheet, rowIndex, getLastHeaderColumnIndex(headers));
 
     if (reports.length > 0) {
       setBlankInjuryRowValues(sheet, rowIndex, getLastHeaderColumnIndex(headers), 'No injuries reported');
