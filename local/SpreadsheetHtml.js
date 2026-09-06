@@ -48,6 +48,7 @@ function renderSheet(name, sheet, changes) {
       const inlineStyle = [
         style.background ? `background:${style.background}` : '',
         style.fontColor ? `color:${style.fontColor}` : '',
+        style.fontWeight ? `font-weight:${style.fontWeight}` : '',
         style.wrap ? 'white-space:pre-wrap' : '',
         style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : '',
         style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : ''

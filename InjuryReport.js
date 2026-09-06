@@ -136,6 +136,7 @@ function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
         .setVerticalAlignment('middle');
 
       if (columnIndex === 0) cell.setHorizontalAlignment('left');
+      if (rowIndex === 0 || columnIndex === 0) cell.setFontWeight('bold');
     }
   }
 
