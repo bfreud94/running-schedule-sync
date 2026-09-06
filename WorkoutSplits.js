@@ -112,7 +112,12 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), WORKOUT_SPLITS_HEADERS.length)
     .setWrap(true)
     .setVerticalAlignment('middle');
-  sheet.getRange(1, 1).setFontWeight('bold');
+  if (sheetData.length > 1) {
+    sheet.getRange(2, 1, sheetData.length - 1, 2)
+      .setVerticalAlignment('top')
+      .setHorizontalAlignment('left');
+  }
+  sheet.getRange(1, 1, 1, WORKOUT_SPLITS_HEADERS.length).setFontWeight('bold');
   sheet.setColumnWidth(1, 140);
   sheet.setColumnWidth(2, 180);
   sheet.setColumnWidth(3, 100);
