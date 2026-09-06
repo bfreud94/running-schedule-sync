@@ -67,6 +67,7 @@ globalThis.UrlFetchApp = {
 const scriptFiles = [
   'DateUtils.js',
   'RunningMetrics.js',
+  'WorkoutSplits.js',
   'SheetUtils.js',
   'InjuryReport.js',
   'StravaAPI.js',

@@ -12,6 +12,7 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
 
     sheet.styles ||= {};
     sheet.columnWidths ||= {};
+    sheet.mergedRanges ||= [];
 
     return {
       setColumnWidth(column, width) {
@@ -21,7 +22,7 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
       getDataRange: () => ({
         getValues: () => sheet.values.map(row => [...row])
       }),
-      getRange(row, column) {
+      getRange(row, column, numRows = 1, numColumns = 1) {
         const rowIndex = row - 1;
         const columnIndex = column - 1;
         sheet.values[rowIndex] ||= [];
@@ -35,6 +36,26 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             changes.push({ sheet: name, row, column, property: 'value', previousValue, value });
             return this;
           },
+          setValues(values) {
+            values.forEach((valuesRow, valuesRowIndex) => {
+              valuesRow.forEach((value, valuesColumnIndex) => {
+                const targetRow = rowIndex + valuesRowIndex;
+                const targetColumn = columnIndex + valuesColumnIndex;
+                sheet.values[targetRow] ||= [];
+                const previousValue = sheet.values[targetRow][targetColumn];
+                sheet.values[targetRow][targetColumn] = value;
+                changes.push({
+                  sheet: name,
+                  row: targetRow + 1,
+                  column: targetColumn + 1,
+                  property: 'value',
+                  previousValue,
+                  value
+                });
+              });
+            });
+            return this;
+          },
           setBackground(value) {
             sheet.styles[`${row},${column}`] ||= {};
             sheet.styles[`${row},${column}`].background = value;
@@ -45,6 +66,12 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             sheet.styles[`${row},${column}`] ||= {};
             sheet.styles[`${row},${column}`].fontColor = value;
             changes.push({ sheet: name, row, column, property: 'fontColor', value });
+            return this;
+          },
+          setFontWeight(value) {
+            sheet.styles[`${row},${column}`] ||= {};
+            sheet.styles[`${row},${column}`].fontWeight = value;
+            changes.push({ sheet: name, row, column, property: 'fontWeight', value });
             return this;
           },
           setNumberFormat(value) {
@@ -63,6 +90,22 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             sheet.styles[`${row},${column}`] ||= {};
             sheet.styles[`${row},${column}`].verticalAlignment = value;
             changes.push({ sheet: name, row, column, property: 'verticalAlignment', value });
+            return this;
+          },
+          merge() {
+            const mergedRange = { row, column, numRows, numColumns };
+            sheet.mergedRanges = sheet.mergedRanges.filter(existing =>
+              existing.row !== row || existing.column !== column
+            );
+            sheet.mergedRanges.push(mergedRange);
+            changes.push({ sheet: name, property: 'mergedRange', value: mergedRange });
+            return this;
+          },
+          breakApart() {
+            sheet.mergedRanges = sheet.mergedRanges.filter(existing =>
+              existing.row < row || existing.row >= row + numRows ||
+              existing.column < column || existing.column >= column + numColumns
+            );
             return this;
           },
           setHorizontalAlignment(value) {

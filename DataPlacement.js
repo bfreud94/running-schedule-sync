@@ -34,6 +34,7 @@ function syncStravaToActualRuns() {
   const dailyWorkouts = calculateDailyWorkouts(activities, targetMonday);
 
   updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset);
+  updateWorkoutSplitsSheet(spreadsheet, activities);
   updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
 
   SpreadsheetApp.flush();

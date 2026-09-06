@@ -20,11 +20,30 @@ function renderSheet(name, sheet, changes) {
       .filter(change => change.sheet === name)
       .map(change => `${change.row},${change.column}`)
   );
+  const mergedCells = new Map();
+  (sheet.mergedRanges || []).forEach(range => {
+    for (let row = range.row; row < range.row + range.numRows; row++) {
+      for (let column = range.column; column < range.column + range.numColumns; column++) {
+        mergedCells.set(`${row},${column}`, {
+          startRow: range.row,
+          startColumn: range.column,
+          rowSpan: range.numRows,
+          columnSpan: range.numColumns
+        });
+      }
+    }
+  });
   const columnCount = Math.max(9, ...sheet.values.map(row => row.length));
   const columns = Array.from({ length: columnCount }, (_, index) => String.fromCharCode(65 + index));
   const rows = sheet.values.map((row, rowIndex) => {
     const cells = columns.map((_, columnIndex) => {
       const key = `${rowIndex + 1},${columnIndex + 1}`;
+      const mergedCell = mergedCells.get(key);
+      if (mergedCell && (
+        mergedCell.startRow !== rowIndex + 1 ||
+        mergedCell.startColumn !== columnIndex + 1
+      )) return '';
+
       const style = sheet.styles?.[key] || {};
       const inlineStyle = [
         style.background ? `background:${style.background}` : '',
@@ -34,7 +53,9 @@ function renderSheet(name, sheet, changes) {
         style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : ''
       ].filter(Boolean).join(';');
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
-      return `<td${changedClass} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;
+      const rowSpan = mergedCell && mergedCell.rowSpan > 1 ? ` rowspan="${mergedCell.rowSpan}"` : '';
+      const columnSpan = mergedCell && mergedCell.columnSpan > 1 ? ` colspan="${mergedCell.columnSpan}"` : '';
+      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;
     }).join('');
 
     return `<tr><th class="row-number">${rowIndex + 1}</th>${cells}</tr>`;
