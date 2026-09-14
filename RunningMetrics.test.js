@@ -14,4 +14,18 @@ test('extracts only the first line after Workout', () => {
     '10 min easy'
   );
   assert.equal(context.workoutTarget('Injury Report:\nKnee: sore'), '');
+  assert.equal(context.workoutTarget('Supplemental Workout:\nCore'), '');
+});
+
+test('collects each supplemental workout until the first blank line', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('RunningMetrics.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.supplementalTarget = parseSupplementalWorkouts;`, context);
+
+  assert.deepEqual(
+    [...context.supplementalTarget('Workout:\n10 min easy\nSupplemental Workout:\n- Very Light Upper Body\n- Core\n\nInjury Report:\nArea: Knee')],
+    ['Very Light Upper Body', 'Core']
+  );
+  assert.deepEqual([...context.supplementalTarget('Workout:\n10 min easy')], []);
 });

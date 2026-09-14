@@ -29,6 +29,18 @@ test('parses workout splits until the first blank line and calculates mile pace'
   assert.equal(context.splitsTarget('Workout:\nEasy run\nNo Splits section', 'Easy run').length, 0);
 });
 
+test('falls back to the split value when no pace is available', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.splitsTarget = parseWorkoutSplits;`, context);
+
+  const splits = context.splitsTarget('Workout:\nTempo intervals\nSplits:\n6:45\n6:32', 'Tempo intervals');
+
+  assert.equal(splits[0].pace, '6:45');
+  assert.equal(splits[1].pace, '6:32');
+});
+
 test('merges date and workout cells across the split rows', () => {
   const mergedRanges = [];
   const sheet = {

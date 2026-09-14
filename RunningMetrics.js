@@ -14,8 +14,39 @@ function isRunningActivity(activity) {
 }
 
 function parseWorkout(description) {
-  const match = String(description || '').match(/workout:\s*\r?\n([^\r\n]*)/i);
+  const match = String(description || '').match(/(?:^|\r?\n)workout:\s*\r?\n([^\r\n]*)/i);
   return match ? match[1].trim() : '';
+}
+
+function parseSupplementalWorkouts(description) {
+  const match = String(description || '').match(/supplemental workouts?:?\s*\r?\n([\s\S]*)/i);
+  if (!match) return [];
+
+  const supplementalWorkouts = [];
+  for (const line of match[1].split(/\r?\n/)) {
+    const supplementalWorkout = line.trim().replace(/^[-*\u2022]\s*/, '');
+    if (!supplementalWorkout) break;
+
+    supplementalWorkouts.push(supplementalWorkout);
+  }
+  return supplementalWorkouts;
+}
+
+function calculateDailySupplementalWorkouts(activities, targetMonday) {
+  const dailySupplementalWorkouts = [[], [], [], [], [], [], []];
+
+  activities.forEach(activity => {
+    const dayOffset = getDayOffset(parseActivityDate(activity), targetMonday);
+    if (dayOffset < 0 || dayOffset > 6) return;
+
+    parseSupplementalWorkouts(activity.description).forEach(supplementalWorkout => {
+      if (!dailySupplementalWorkouts[dayOffset].includes(supplementalWorkout)) {
+        dailySupplementalWorkouts[dayOffset].push(supplementalWorkout);
+      }
+    });
+  });
+
+  return dailySupplementalWorkouts;
 }
 
 function calculateDailyWorkouts(activities, targetMonday) {

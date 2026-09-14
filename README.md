@@ -44,6 +44,8 @@ Strava activity descriptions are parsed for special sections:
 
 - **`Workout:`** followed by a line of free text — copied into the daily **Actual Runs** cell and
   the **Workout Splits** sheet.
+- **`Supplemental Workout:`** followed by one supplemental exercise per line — each one is added as
+  its own line in the daily **Actual Runs** cell.
 - **`Splits:`** followed by one split per line (e.g. `6:45` or `6:45 6:32`) — each line's first
   duration is the split time; a second duration, if present, is used as the pace, otherwise pace is
   calculated from the workout's parsed distance.

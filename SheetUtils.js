@@ -9,6 +9,38 @@ function findWeekRowIndex(sheetData, targetMonday) {
   return sheetData.findIndex(row => areSameDate(getWeekDate(row[0]), targetMonday));
 }
 
+function formatWeekLabel(weekNumber, monday) {
+  return `WEEK ${weekNumber} (${monday.getMonth() + 1}/${monday.getDate()})`;
+}
+
+function getNextWeekNumber(sheetData, targetMonday) {
+  for (let rowIndex = sheetData.length - 1; rowIndex >= 0; rowIndex--) {
+    const label = String(sheetData[rowIndex][0] || '').trim();
+    const weekNumberMatch = label.toUpperCase().match(/^WEEK\s+(\d+)/);
+    const weekDate = getWeekDate(label);
+    if (!weekNumberMatch || !weekDate) continue;
+
+    const weeksElapsed = Math.max(1, Math.round(getDayOffset(targetMonday, weekDate) / 7));
+    return parseInt(weekNumberMatch[1], 10) + weeksElapsed;
+  }
+
+  return 1;
+}
+
+function appendWeekRow(actualSheet, sheetData, targetMonday) {
+  const rowIndex = sheetData.length;
+  const weekLabel = formatWeekLabel(getNextWeekNumber(sheetData, targetMonday), targetMonday);
+  actualSheet.getRange(rowIndex + 1, 1).setValue(weekLabel);
+
+  // Carry the previous row's total formula forward; the local mock has no formula support.
+  const previousTotalFormula = rowIndex > 0 ? actualSheet.getRange(rowIndex, 9).getFormula?.() : '';
+  if (previousTotalFormula) {
+    actualSheet.getRange(rowIndex + 1, 9).setFormula(previousTotalFormula);
+  }
+
+  return rowIndex;
+}
+
 function isRestValue(value) {
   return /(^|\n)rest($|\n)/i.test(String(value || '').trim());
 }
@@ -38,12 +70,12 @@ function applyCellStyle(cell, style) {
   cell.setFontColor(style.fontColor);
 }
 
-function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset) {
+function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts = []) {
   for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const existingValue = String(targetCell.getValue() || '').replace(/\u00A0/g, ' ').trim();
     const isRest = isRestValue(existingValue);
-    const workoutText = dailyWorkouts[dayIndex].join('\n');
+    const workoutText = [...dailyWorkouts[dayIndex], ...(dailySupplementalWorkouts[dayIndex] || [])].join('\n');
     const needsWorkoutBackfill = workoutText && !existingValue.includes(workoutText);
     const canUpdate = dayIndex === todayOffset || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [') || needsWorkoutBackfill;
 

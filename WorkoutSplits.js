@@ -33,11 +33,12 @@ function parseSplitLine(line, distanceMiles) {
   const split = durations[0];
   const splitSeconds = parseSplitSeconds(split);
   const explicitPace = durations[1] || '';
+  const calculatedPace = distanceMiles && splitSeconds !== null
+    ? formatSplitPace(splitSeconds / distanceMiles)
+    : '';
   return {
     value: split,
-    pace: explicitPace || (distanceMiles && splitSeconds !== null
-      ? formatSplitPace(splitSeconds / distanceMiles)
-      : '')
+    pace: explicitPace || calculatedPace || split
   };
 }
 

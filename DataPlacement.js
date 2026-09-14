@@ -13,14 +13,14 @@ function syncStravaToActualRuns() {
   }
 
   const actualData = actualSheet.getDataRange().getValues();
-  if (actualData.length === 0) return;
-
   const targetMonday = getMostRecentMonday();
-  const targetRowIndex = findWeekRowIndex(actualData, targetMonday);
+  const existingRowIndex = findWeekRowIndex(actualData, targetMonday);
+  const targetRowIndex = existingRowIndex === -1
+    ? appendWeekRow(actualSheet, actualData, targetMonday)
+    : existingRowIndex;
 
-  if (targetRowIndex === -1) {
-    Logger.log(`No matching row found for Monday (${targetMonday.toLocaleDateString()}). Skipping execution.`);
-    return;
+  if (existingRowIndex === -1) {
+    Logger.log(`Created a new week row for Monday (${targetMonday.toLocaleDateString()}).`);
   }
 
   Logger.log(`Targeting current week row at index ${targetRowIndex + 1}`);
@@ -32,8 +32,9 @@ function syncStravaToActualRuns() {
   const activities = fetchStravaActivitiesSince(targetMonday);
   const dailyMiles = calculateDailyRunMiles(activities, targetMonday);
   const dailyWorkouts = calculateDailyWorkouts(activities, targetMonday);
+  const dailySupplementalWorkouts = calculateDailySupplementalWorkouts(activities, targetMonday);
 
-  updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset);
+  updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts);
   updateWorkoutSplitsSheet(spreadsheet, activities);
   updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
 
