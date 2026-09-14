@@ -1,5 +1,7 @@
 const WORKOUT_SPLITS_SHEET_NAME = 'Workout Splits';
 const WORKOUT_SPLITS_HEADERS = ['Date', 'Workout', 'Splits', 'Splits (Pace)'];
+const WORKOUT_SPLITS_SEPARATOR_BACKGROUND = '#000000';
+const WORKOUT_SPLITS_SEPARATOR_HEIGHT = 10;
 
 function parseSplitSeconds(value) {
   const match = String(value || '').trim().match(/(\d+):([0-5]\d)(?:\.(\d+))?\s*$/);
@@ -66,6 +68,22 @@ function ensureWorkoutSplitsHeader(sheet, sheetData) {
   return sheetData;
 }
 
+function writeSeparatorRow(sheet, rowIndex) {
+  for (let column = 1; column <= WORKOUT_SPLITS_HEADERS.length; column++) {
+    sheet.getRange(rowIndex + 1, column).setBackground(WORKOUT_SPLITS_SEPARATOR_BACKGROUND);
+  }
+  sheet.setRowHeight(rowIndex + 1, WORKOUT_SPLITS_SEPARATOR_HEIGHT);
+}
+
+function findAppendRowIndex(sheet, sheetData) {
+  // Separator rows hold no values, so the data range can stop short of them.
+  let rowIndex = sheetData.length;
+  while (sheet.getRange(rowIndex + 1, 1).getBackground() === WORKOUT_SPLITS_SEPARATOR_BACKGROUND) {
+    rowIndex++;
+  }
+  return rowIndex;
+}
+
 function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) {
   const dateKey = getDateKey(activityDate);
   const firstRowIndex = sheetData.findIndex((row, index) => {
@@ -73,7 +91,7 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
     const rowDate = parseSheetDate(row[0]);
     return rowDate && getDateKey(rowDate) === dateKey && String(row[1] || '').trim() === workout;
   });
-  const startRowIndex = firstRowIndex === -1 ? sheetData.length : firstRowIndex;
+  const startRowIndex = firstRowIndex === -1 ? findAppendRowIndex(sheet, sheetData) : firstRowIndex;
   const activityRange = sheet.getRange(startRowIndex + 1, 1, splits.length, 2);
   if (activityRange.breakApart) activityRange.breakApart();
 
@@ -93,6 +111,8 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
       .merge()
       .setVerticalAlignment('top');
   }
+
+  writeSeparatorRow(sheet, startRowIndex + splits.length);
 }
 
 function updateWorkoutSplitsSheet(spreadsheet, activities) {

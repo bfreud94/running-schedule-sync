@@ -43,11 +43,16 @@ test('falls back to the split value when no pace is available', () => {
 
 test('merges date and workout cells across the split rows', () => {
   const mergedRanges = [];
+  const backgrounds = [];
+  const rowHeights = [];
   const sheet = {
+    setRowHeight: (row, height) => { rowHeights.push({ row, height }); },
     getRange(row, column, numRows = 1, numColumns = 1) {
       return {
         setValues: () => ({ setNumberFormat: () => {} }),
         setNumberFormat: () => {},
+        setBackground: value => { backgrounds.push({ row, column, value }); },
+        getBackground: () => '#ffffff',
         breakApart: () => {},
         merge: () => {
           mergedRanges.push({ row, column, numRows, numColumns });
@@ -76,4 +81,11 @@ test('merges date and workout cells across the split rows', () => {
     { row: 2, column: 1, numRows: 4, numColumns: 1 },
     { row: 2, column: 2, numRows: 4, numColumns: 1 }
   ]);
+  assert.deepEqual(backgrounds, [
+    { row: 6, column: 1, value: '#000000' },
+    { row: 6, column: 2, value: '#000000' },
+    { row: 6, column: 3, value: '#000000' },
+    { row: 6, column: 4, value: '#000000' }
+  ]);
+  assert.deepEqual(rowHeights, [{ row: 6, height: 10 }]);
 });

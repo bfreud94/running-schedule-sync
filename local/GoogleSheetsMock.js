@@ -12,12 +12,17 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
 
     sheet.styles ||= {};
     sheet.columnWidths ||= {};
+    sheet.rowHeights ||= {};
     sheet.mergedRanges ||= [];
 
     return {
       setColumnWidth(column, width) {
         sheet.columnWidths[column] = width;
         changes.push({ sheet: name, column, property: 'columnWidth', value: width });
+      },
+      setRowHeight(row, height) {
+        sheet.rowHeights[row] = height;
+        changes.push({ sheet: name, row, property: 'rowHeight', value: height });
       },
       getDataRange: () => ({
         getValues: () => sheet.values.map(row => [...row])

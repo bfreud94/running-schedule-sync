@@ -36,6 +36,11 @@ function renderSheet(name, sheet, changes) {
   const columnCount = Math.max(9, ...sheet.values.map(row => row.length));
   const columns = Array.from({ length: columnCount }, (_, index) => String.fromCharCode(65 + index));
   const rows = sheet.values.map((row, rowIndex) => {
+    const rowHeight = sheet.rowHeights?.[rowIndex + 1];
+    // Cell padding would otherwise keep short rows from rendering at their true height.
+    const heightStyle = rowHeight
+      ? `height:${rowHeight}px;padding:0;line-height:${rowHeight}px;font-size:${Math.min(rowHeight, 13)}px`
+      : '';
     const cells = columns.map((_, columnIndex) => {
       const key = `${rowIndex + 1},${columnIndex + 1}`;
       const mergedCell = mergedCells.get(key);
@@ -51,7 +56,8 @@ function renderSheet(name, sheet, changes) {
         style.fontWeight ? `font-weight:${style.fontWeight}` : '',
         style.wrap ? 'white-space:pre-wrap' : '',
         style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : '',
-        style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : ''
+        style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : '',
+        heightStyle
       ].filter(Boolean).join(';');
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       const rowSpan = mergedCell && mergedCell.rowSpan > 1 ? ` rowspan="${mergedCell.rowSpan}"` : '';
@@ -59,7 +65,8 @@ function renderSheet(name, sheet, changes) {
       return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;
     }).join('');
 
-    return `<tr><th class="row-number">${rowIndex + 1}</th>${cells}</tr>`;
+    const rowStyle = rowHeight ? ` style="height:${rowHeight}px"` : '';
+    return `<tr${rowStyle}><th class="row-number" style="${heightStyle}">${rowIndex + 1}</th>${cells}</tr>`;
   }).join('');
 
   return `

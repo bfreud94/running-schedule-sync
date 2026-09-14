@@ -2,7 +2,15 @@
   "sheets": {
     "Actual Runs": {
       "values": [
-        ["WEEK 1 (8/31)", "", "", "", "", "", "", "", "0 miles"]
+        ["WEEK 1 (8/31)",
+        "4.15 miles",
+        "5.12 miles",
+        "Rest",
+        "3.19 miles",
+        "6.03 miles\n1000m repeats",
+        "Rest",
+        "7.24 miles",
+        "25.73 miles"]
       ]
     },
     "Planned Schedule": {
