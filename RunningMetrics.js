@@ -18,18 +18,70 @@ function parseWorkout(description) {
   return match ? match[1].trim() : '';
 }
 
-function parseSupplementalWorkouts(description) {
+function parseSupplementalWorkoutSection(description) {
   const match = String(description || '').match(/supplemental workouts?:?\s*\r?\n([\s\S]*)/i);
-  if (!match) return [];
+  if (!match) return '';
 
-  const supplementalWorkouts = [];
+  const sectionLines = [];
   for (const line of match[1].split(/\r?\n/)) {
-    const supplementalWorkout = line.trim().replace(/^[-*\u2022]\s*/, '');
-    if (!supplementalWorkout) break;
-
-    supplementalWorkouts.push(supplementalWorkout);
+    if (!line.trim()) break;
+    sectionLines.push(line);
   }
-  return supplementalWorkouts;
+  return sectionLines.join('\n');
+}
+
+function parseSupplementalExerciseLine(line, category) {
+  const match = String(line || '').trim().match(/^\d+\.\s*([^()]+?)(?:\s*\(([^)]*)\))?\s*$/);
+  if (!match) return null;
+
+  const workout = match[1].trim();
+  const details = String(match[2] || '').trim();
+  const detailParts = details ? details.split(',').map(part => part.trim()).filter(Boolean) : [];
+  const setsAndRepsMatch = (detailParts.shift() || '').match(/^(\d+)\s*x\s*(.+)$/i);
+
+  return {
+    category,
+    workout,
+    sets: setsAndRepsMatch ? setsAndRepsMatch[1] : '',
+    repsHoldTime: setsAndRepsMatch ? setsAndRepsMatch[2].trim() : '',
+    notes: detailParts.join(', ')
+  };
+}
+
+function parseSupplementalWorkoutDetails(description) {
+  const section = parseSupplementalWorkoutSection(description);
+  if (!section) return { categories: [], exercises: [] };
+
+  const categories = [];
+  const exercises = [];
+  let currentCategory = '';
+  for (const line of section.split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+    const categoryMatch = trimmedLine.match(/^([^:]+):\s*$/);
+    if (categoryMatch) {
+      currentCategory = categoryMatch[1].trim();
+      if (currentCategory && !categories.includes(currentCategory)) categories.push(currentCategory);
+      continue;
+    }
+
+    const exercise = parseSupplementalExerciseLine(trimmedLine, currentCategory);
+    if (exercise) {
+      exercises.push(exercise);
+      continue;
+    }
+
+    const supplementalWorkout = trimmedLine.replace(/^[-*\u2022]\s*/, '');
+    if (supplementalWorkout) {
+      currentCategory = supplementalWorkout;
+      if (!categories.includes(supplementalWorkout)) categories.push(supplementalWorkout);
+    }
+  }
+
+  return { categories, exercises };
+}
+
+function parseSupplementalWorkouts(description) {
+  return parseSupplementalWorkoutDetails(description).categories;
 }
 
 function calculateDailySupplementalWorkouts(activities, targetMonday) {

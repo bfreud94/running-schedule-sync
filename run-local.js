@@ -68,6 +68,7 @@ const scriptFiles = [
   'DateUtils.js',
   'RunningMetrics.js',
   'WorkoutSplits.js',
+  'SupplementalWorkouts.js',
   'SheetUtils.js',
   'InjuryReport.js',
   'StravaAPI.js',
