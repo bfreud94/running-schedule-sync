@@ -12,7 +12,7 @@ function parseInjuryReport(description) {
   if (!match) return null;
 
   const bodyPart = match[1].trim();
-  const reportBody = match[2].trim();
+  const reportBody = match[2].split(/\r?\n\s*\r?\n/)[0].trim();
   const severityMatch = reportBody.match(/(?:^|\r?\n)severity:\s*(\d+(?:\.5)?)\s*\/\s*10(?:\r?\n|$)/i);
   const severity = severityMatch ? Number(severityMatch[1]) : 0;
   return bodyPart ? { bodyPart, description: reportBody, severity } : null;

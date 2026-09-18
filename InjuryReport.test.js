@@ -18,6 +18,21 @@ test('parses the body part from the Area line after Injury Report', () => {
   assert.equal(context.injuryTarget('Injury Report:\nLeft Groin: Tight after workout'), null);
 });
 
+test('cuts off the injury report body at the first blank line', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReport;`, context);
+
+  const report = context.injuryTarget(
+    'Injury Report:\nArea: Left Foot\nSeverity: 3/10\nSymptoms: Mildly sharp pain\n\nSupplemental Workouts:\nCore\n1. Planks (2x1:30)'
+  );
+
+  assert.equal(report.bodyPart, 'Left Foot');
+  assert.equal(report.description, 'Severity: 3/10\nSymptoms: Mildly sharp pain');
+  assert.equal(report.severity, 3);
+});
+
 test('new body-part columns copy backgrounds from the previous column', () => {
   const backgrounds = {
     '1,2': '#eeeeee',
