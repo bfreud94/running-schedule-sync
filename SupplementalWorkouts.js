@@ -1,5 +1,5 @@
 const SUPPLEMENTAL_WORKOUTS_SHEET_NAME = 'Supplemental Workouts';
-const SUPPLEMENTAL_WORKOUTS_HEADERS = ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Notes'];
+const SUPPLEMENTAL_WORKOUTS_HEADERS = ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'];
 const SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND = '#000000';
 const SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT = 10;
 
@@ -29,7 +29,7 @@ function groupExercisesByCategory(exercises) {
 function buildDaySignature(dateKey, groups) {
   const groupSignatures = groups.map(group => {
     const exerciseSignatures = group.exercises
-      .map(exercise => [exercise.workout, exercise.sets, exercise.repsHoldTime, exercise.notes].join('|'))
+      .map(exercise => [exercise.workout, exercise.sets, exercise.repsHoldTime, exercise.weight, exercise.notes].join('|'))
       .join(';');
     return `${group.category}:${exerciseSignatures}`;
   });
@@ -73,7 +73,8 @@ function getExistingDaySignatures(sheetData) {
         workout: row[2] || '',
         sets: row[3] || '',
         repsHoldTime: row[4] || '',
-        notes: row[5] || ''
+        weight: row[5] || '',
+        notes: row[6] || ''
       });
     }
   });
@@ -100,6 +101,7 @@ function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group
       exercise.workout,
       exercise.sets,
       exercise.repsHoldTime,
+      exercise.weight,
       exercise.notes
     ]]);
     if (exerciseIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d, yyyy');
@@ -160,5 +162,6 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sheet.setColumnWidth(3, 170);
   sheet.setColumnWidth(4, 70);
   sheet.setColumnWidth(5, 140);
-  sheet.setColumnWidth(6, 220);
+  sheet.setColumnWidth(6, 110);
+  sheet.setColumnWidth(7, 220);
 }

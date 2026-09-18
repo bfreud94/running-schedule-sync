@@ -19,9 +19,9 @@ test('groups exercises by category, preserving first-seen order', () => {
   vm.runInContext('globalThis.groupTarget = groupExercisesByCategory;', context);
 
   const groups = context.groupTarget([
-    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '1:30', notes: '' },
-    { category: 'Upper Body', workout: 'Bench Press', sets: '3', repsHoldTime: '10', notes: '' },
-    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', notes: 'each side' }
+    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
+    { category: 'Upper Body', workout: 'Bench Press', sets: '3', repsHoldTime: '10', weight: '135 lbs', notes: '' },
+    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
   ]);
 
   assert.equal(groups.length, 2);
@@ -48,14 +48,14 @@ test('writes one merged row block per category', () => {
   const nextRowIndex = context.writeGroupTarget(sheet, 1, new Date(2026, 8, 16), {
     category: 'Core',
     exercises: [
-      { workout: 'Planks', sets: '2', repsHoldTime: '1:30', notes: '' },
-      { workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', notes: 'each side' }
+      { workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
+      { workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
     ]
   });
 
   assert.equal(nextRowIndex, 3);
-  assert.deepEqual(JSON.parse(JSON.stringify(values[0].rowValues)), JSON.parse(JSON.stringify([new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', ''])));
-  assert.deepEqual(JSON.parse(JSON.stringify(values[1].rowValues)), ['', '', 'Side Planks', '2', '1:00', 'each side']);
+  assert.deepEqual(JSON.parse(JSON.stringify(values[0].rowValues)), JSON.parse(JSON.stringify([new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', 'N/A', ''])));
+  assert.deepEqual(JSON.parse(JSON.stringify(values[1].rowValues)), ['', '', 'Side Planks', '2', '1:00', 'N/A', 'each side']);
   assert.deepEqual(JSON.parse(JSON.stringify(merges)), [
     { row: 2, column: 1, numRows: 2, numColumns: 1 },
     { row: 2, column: 2, numRows: 2, numColumns: 1 }
@@ -67,17 +67,17 @@ test('does not duplicate a day already recorded with the same exercises', () => 
   vm.runInContext('globalThis.signaturesTarget = getExistingDaySignatures; globalThis.signatureTarget = buildDaySignature;', context);
 
   const sheetData = [
-    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Notes'],
-    [new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', ''],
-    ['', '', 'Side Planks', '2', '1:00', 'each side'],
-    ['', '', '', '', '', '']
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', 'N/A', ''],
+    ['', '', 'Side Planks', '2', '1:00', 'N/A', 'each side'],
+    ['', '', '', '', '', '', '']
   ];
 
   const signatures = context.signaturesTarget(sheetData);
   const rebuiltSignature = context.signatureTarget('2026-09-16', [
     { category: 'Core', exercises: [
-      { workout: 'Planks', sets: '2', repsHoldTime: '1:30', notes: '' },
-      { workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', notes: 'each side' }
+      { workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
+      { workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
     ] }
   ]);
 

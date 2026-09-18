@@ -7,30 +7,50 @@ test('parses the body part from the Area line after Injury Report', () => {
   const context = vm.createContext({ console });
   const source = readFileSync('InjuryReport.js', 'utf8');
 
-  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReport;`, context);
+  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReports;`, context);
 
-  const report = context.injuryTarget(
+  const reports = context.injuryTarget(
     'Injury Report:\nArea: Left Groin\nSeverity: 3/10\nTight after workout'
   );
-  assert.equal(report.bodyPart, 'Left Groin');
-  assert.equal(report.description, 'Severity: 3/10\nTight after workout');
-  assert.equal(report.severity, 3);
-  assert.equal(context.injuryTarget('Injury Report:\nLeft Groin: Tight after workout'), null);
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].bodyPart, 'Left Groin');
+  assert.equal(reports[0].description, 'Severity: 3/10\nTight after workout');
+  assert.equal(reports[0].severity, 3);
+  assert.deepEqual([...context.injuryTarget('Injury Report:\nLeft Groin: Tight after workout')], []);
 });
 
 test('cuts off the injury report body at the first blank line', () => {
   const context = vm.createContext({ console });
   const source = readFileSync('InjuryReport.js', 'utf8');
 
-  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReport;`, context);
+  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReports;`, context);
 
-  const report = context.injuryTarget(
+  const reports = context.injuryTarget(
     'Injury Report:\nArea: Left Foot\nSeverity: 3/10\nSymptoms: Mildly sharp pain\n\nSupplemental Workouts:\nCore\n1. Planks (2x1:30)'
   );
 
-  assert.equal(report.bodyPart, 'Left Foot');
-  assert.equal(report.description, 'Severity: 3/10\nSymptoms: Mildly sharp pain');
-  assert.equal(report.severity, 3);
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].bodyPart, 'Left Foot');
+  assert.equal(reports[0].description, 'Severity: 3/10\nSymptoms: Mildly sharp pain');
+  assert.equal(reports[0].severity, 3);
+});
+
+test('parses every Area block in a multi-body-part Injury Report, including 0/10 severity', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.injuryTarget = parseInjuryReports;`, context);
+
+  const reports = context.injuryTarget(
+    'Injury Report:\nArea: Left Calf\nSeverity: 1/10\nSymptoms: Soreness prior to the run\n\nArea: Left Foot\nSeverity: 0/10\nSymptoms: None'
+  );
+
+  assert.equal(reports.length, 2);
+  assert.equal(reports[0].bodyPart, 'Left Calf');
+  assert.equal(reports[0].severity, 1);
+  assert.equal(reports[1].bodyPart, 'Left Foot');
+  assert.equal(reports[1].severity, 0);
+  assert.equal(reports[1].description, 'Severity: 0/10\nSymptoms: None');
 });
 
 test('new body-part columns copy backgrounds from the previous column', () => {

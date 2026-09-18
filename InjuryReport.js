@@ -7,15 +7,23 @@ function getOrCreateInjuryReportSheet(spreadsheet, date = new Date()) {
   return spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
 }
 
-function parseInjuryReport(description) {
-  const match = String(description || '').match(/injury report:?\s*\r?\n\s*area:\s*([^\r\n]+)(?:\r?\n|$)([\s\S]*)/i);
-  if (!match) return null;
+function parseInjuryReports(description) {
+  const sectionMatch = String(description || '').match(/injury report:?\s*\r?\n([\s\S]*)/i);
+  if (!sectionMatch) return [];
 
-  const bodyPart = match[1].trim();
-  const reportBody = match[2].split(/\r?\n\s*\r?\n/)[0].trim();
-  const severityMatch = reportBody.match(/(?:^|\r?\n)severity:\s*(\d+(?:\.5)?)\s*\/\s*10(?:\r?\n|$)/i);
-  const severity = severityMatch ? Number(severityMatch[1]) : 0;
-  return bodyPart ? { bodyPart, description: reportBody, severity } : null;
+  const reports = [];
+  for (const paragraph of sectionMatch[1].split(/\r?\n\s*\r?\n/)) {
+    const areaMatch = paragraph.match(/^\s*area:\s*([^\r\n]+)(?:\r?\n|$)([\s\S]*)/i);
+    if (!areaMatch) break; // a non-Area paragraph marks the end of the Injury Report section
+
+    const bodyPart = areaMatch[1].trim();
+    const reportBody = areaMatch[2].trim();
+    const severityMatch = reportBody.match(/(?:^|\r?\n)severity:\s*(\d+(?:\.5)?)\s*\/\s*10(?:\r?\n|$)/i);
+    const severity = severityMatch ? Number(severityMatch[1]) : 0;
+    if (bodyPart) reports.push({ bodyPart, description: reportBody, severity });
+  }
+
+  return reports;
 }
 
 function blendColor(startHex, endHex, ratio) {
@@ -189,9 +197,7 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
   const reportsByDate = Object.fromEntries(
     Object.entries(activitiesByDate).map(([dateKey, dateActivities]) => [
       dateKey,
-      dateActivities
-        .map(activity => parseInjuryReport(activity.description))
-        .filter(report => report !== null)
+      dateActivities.flatMap(activity => parseInjuryReports(activity.description))
     ])
   );
 

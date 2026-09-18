@@ -50,9 +50,9 @@ test('collects category names and exercise details from structured supplemental 
 
   assert.deepEqual(details.categories, ['Core', 'Upper Body']);
   assert.deepEqual(details.exercises, [
-    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '60 seconds', notes: '' },
-    { category: 'Core', workout: 'Side planks', sets: '2', repsHoldTime: '60 seconds', notes: 'each side' },
-    { category: 'Upper Body', workout: 'Bench Press', sets: '3', repsHoldTime: '10', notes: '70 lbs, 75 lbs, 80 lbs' }
+    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '60 seconds', weight: 'N/A', notes: '' },
+    { category: 'Core', workout: 'Side planks', sets: '2', repsHoldTime: '60 seconds', weight: 'N/A', notes: 'each side' },
+    { category: 'Upper Body', workout: 'Bench Press', sets: '3', repsHoldTime: '10', weight: '70 lbs\n75 lbs\n80 lbs', notes: '' }
   ]);
 });
 
@@ -71,7 +71,27 @@ test('treats plain supplemental lines as categories for numbered exercises', () 
 
   assert.deepEqual(details.categories, ['Core']);
   assert.deepEqual(details.exercises, [
-    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '1:30', notes: '' },
-    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', notes: 'each side' }
+    { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
+    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
+  ]);
+});
+
+test('normalizes an Area-prefixed category line and detects weights mentioned inline', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('RunningMetrics.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.detailsTarget = parseSupplementalWorkoutDetails;`, context);
+
+  const details = JSON.parse(JSON.stringify(context.detailsTarget([
+    'Supplemental Workouts:',
+    'Area: Upper Body Lift',
+    '1. Bench Press (3x8, 1st two @ 75 lbs, last set @ 85 lbs)',
+    '2. Overhead Press (3x6 @ 45 lbs)'
+  ].join('\n'))));
+
+  assert.deepEqual(details.categories, ['Upper Body Lift']);
+  assert.deepEqual(details.exercises, [
+    { category: 'Upper Body Lift', workout: 'Bench Press', sets: '3', repsHoldTime: '8', weight: '1st two @ 75 lbs\nlast set @ 85 lbs', notes: '' },
+    { category: 'Upper Body Lift', workout: 'Overhead Press', sets: '3', repsHoldTime: '6', weight: '45 lbs', notes: '' }
   ]);
 });

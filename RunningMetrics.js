@@ -30,6 +30,10 @@ function parseSupplementalWorkoutSection(description) {
   return sectionLines.join('\n');
 }
 
+function isWeightDetail(detail) {
+  return /\d+(?:\.\d+)?\s*(?:lbs?|pounds?|kgs?|kilograms?)\b/i.test(detail) || /^bodyweight$/i.test(detail);
+}
+
 function parseSupplementalExerciseLine(line, category) {
   const match = String(line || '').trim().match(/^\d+\.\s*([^()]+?)(?:\s*\(([^)]*)\))?\s*$/);
   if (!match) return null;
@@ -39,12 +43,21 @@ function parseSupplementalExerciseLine(line, category) {
   const detailParts = details ? details.split(',').map(part => part.trim()).filter(Boolean) : [];
   const setsAndRepsMatch = (detailParts.shift() || '').match(/^(\d+)\s*x\s*(.+)$/i);
 
+  let repsHoldTime = setsAndRepsMatch ? setsAndRepsMatch[2].trim() : '';
+  const inlineWeightMatch = repsHoldTime.match(/^(.*?)\s*@\s*(.+)$/);
+  const inlineWeight = inlineWeightMatch && isWeightDetail(inlineWeightMatch[2]) ? inlineWeightMatch[2].trim() : '';
+  if (inlineWeight) repsHoldTime = inlineWeightMatch[1].trim();
+
+  const weightParts = [inlineWeight, ...detailParts.filter(isWeightDetail)].filter(Boolean);
+  const noteParts = detailParts.filter(part => !isWeightDetail(part));
+
   return {
     category,
     workout,
     sets: setsAndRepsMatch ? setsAndRepsMatch[1] : '',
-    repsHoldTime: setsAndRepsMatch ? setsAndRepsMatch[2].trim() : '',
-    notes: detailParts.join(', ')
+    repsHoldTime,
+    weight: weightParts.length ? weightParts.join('\n') : 'N/A',
+    notes: noteParts.join(', ')
   };
 }
 
@@ -70,7 +83,8 @@ function parseSupplementalWorkoutDetails(description) {
       continue;
     }
 
-    const supplementalWorkout = trimmedLine.replace(/^[-*\u2022]\s*/, '');
+    const areaMatch = trimmedLine.match(/^area:\s*(.+)$/i);
+    const supplementalWorkout = (areaMatch ? areaMatch[1] : trimmedLine).replace(/^[-*\u2022]\s*/, '');
     if (supplementalWorkout) {
       currentCategory = supplementalWorkout;
       if (!categories.includes(supplementalWorkout)) categories.push(supplementalWorkout);
