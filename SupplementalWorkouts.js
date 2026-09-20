@@ -40,28 +40,12 @@ function isBlankRow(row) {
   return row.every(value => String(value || '').trim() === '');
 }
 
-function getExistingDaySignatures(sheetData) {
-  const signatures = new Set();
-  let dateKey = null;
-  let groups = [];
+function getBlockGroups(sheetData, block) {
+  const groups = [];
   let currentGroup = null;
 
-  const flushDay = () => {
-    if (dateKey && groups.length > 0) signatures.add(buildDaySignature(dateKey, groups));
-    dateKey = null;
-    groups = [];
-    currentGroup = null;
-  };
-
-  sheetData.slice(1).forEach(row => {
-    if (isBlankRow(row)) {
-      flushDay();
-      return;
-    }
-
-    const rowDate = parseSheetDate(row[0]);
-    if (rowDate) dateKey = getDateKey(rowDate);
-
+  for (let rowOffset = 0; rowOffset < block.rowCount; rowOffset++) {
+    const row = sheetData[block.startRowIndex + rowOffset];
     const category = String(row[1] || '').trim();
     if (category) {
       currentGroup = { category, exercises: [] };
@@ -77,10 +61,33 @@ function getExistingDaySignatures(sheetData) {
         notes: row[6] || ''
       });
     }
-  });
-  flushDay();
+  }
 
-  return signatures;
+  return groups;
+}
+
+function findDayBlock(sheetData, dateKey) {
+  let blockStartIndex = null;
+
+  for (let rowIndex = 1; rowIndex <= sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const isBoundary = rowIndex === sheetData.length || isBlankRow(row);
+
+    if (isBoundary) {
+      if (blockStartIndex !== null) {
+        const blockDate = parseSheetDate(sheetData[blockStartIndex][0]);
+        if (blockDate && getDateKey(blockDate) === dateKey) {
+          return { startRowIndex: blockStartIndex, rowCount: rowIndex - blockStartIndex };
+        }
+        blockStartIndex = null;
+      }
+      continue;
+    }
+
+    if (blockStartIndex === null) blockStartIndex = rowIndex;
+  }
+
+  return null;
 }
 
 function findAppendRowIndex(sheet, sheetData) {
@@ -127,16 +134,25 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME)
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
-  const existingDaySignatures = getExistingDaySignatures(sheetData);
 
   activities.forEach(activity => {
     const exercises = parseSupplementalWorkoutDetails(activity.description).exercises;
     if (exercises.length === 0) return;
 
     const activityDate = parseActivityDate(activity);
+    const dateKey = getDateKey(activityDate);
     const groups = groupExercisesByCategory(exercises);
-    const daySignature = buildDaySignature(getDateKey(activityDate), groups);
-    if (existingDaySignatures.has(daySignature)) return;
+    const daySignature = buildDaySignature(dateKey, groups);
+
+    const existingBlock = findDayBlock(sheetData, dateKey);
+    if (existingBlock) {
+      const existingSignature = buildDaySignature(dateKey, getBlockGroups(sheetData, existingBlock));
+      if (existingSignature === daySignature) return;
+
+      // Overwrite: drop the day's old rows (plus its trailing separator) and re-append fresh ones.
+      sheet.deleteRows(existingBlock.startRowIndex + 1, existingBlock.rowCount + 1);
+      sheetData = sheet.getDataRange().getValues();
+    }
 
     let rowIndex = findAppendRowIndex(sheet, sheetData);
     groups.forEach(group => {
@@ -144,7 +160,6 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
     });
     writeSeparatorRow(sheet, rowIndex);
 
-    existingDaySignatures.add(daySignature);
     sheetData = sheet.getDataRange().getValues();
   });
 

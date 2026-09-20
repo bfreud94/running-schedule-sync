@@ -24,6 +24,35 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         sheet.rowHeights[row] = height;
         changes.push({ sheet: name, row, property: 'rowHeight', value: height });
       },
+      deleteRows(startRow, numRows) {
+        sheet.values.splice(startRow - 1, numRows);
+
+        const shiftRow = row => {
+          if (row >= startRow && row < startRow + numRows) return null;
+          return row >= startRow + numRows ? row - numRows : row;
+        };
+
+        const shiftedStyles = {};
+        Object.entries(sheet.styles).forEach(([key, value]) => {
+          const [row, column] = key.split(',').map(Number);
+          const shiftedRow = shiftRow(row);
+          if (shiftedRow !== null) shiftedStyles[`${shiftedRow},${column}`] = value;
+        });
+        sheet.styles = shiftedStyles;
+
+        const shiftedRowHeights = {};
+        Object.entries(sheet.rowHeights).forEach(([rowKey, value]) => {
+          const shiftedRow = shiftRow(Number(rowKey));
+          if (shiftedRow !== null) shiftedRowHeights[shiftedRow] = value;
+        });
+        sheet.rowHeights = shiftedRowHeights;
+
+        sheet.mergedRanges = sheet.mergedRanges
+          .filter(range => shiftRow(range.row) !== null)
+          .map(range => ({ ...range, row: shiftRow(range.row) }));
+
+        changes.push({ sheet: name, row: startRow, property: 'deleteRows', value: numRows });
+      },
       getDataRange: () => ({
         getValues: () => sheet.values.map(row => [...row])
       }),

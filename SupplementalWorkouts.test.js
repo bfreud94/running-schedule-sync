@@ -1,7 +1,10 @@
 const assert = require('node:assert/strict');
-const { readFileSync } = require('node:fs');
+const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { createGoogleSheetsMock } = require('./local/GoogleSheetsMock');
 
 function loadContext() {
   const context = vm.createContext({
@@ -62,24 +65,71 @@ test('writes one merged row block per category', () => {
   ]);
 });
 
-test('does not duplicate a day already recorded with the same exercises', () => {
+test('finds an existing day block and reconstructs its groups', () => {
   const context = loadContext();
-  vm.runInContext('globalThis.signaturesTarget = getExistingDaySignatures; globalThis.signatureTarget = buildDaySignature;', context);
+  vm.runInContext('globalThis.findBlockTarget = findDayBlock; globalThis.blockGroupsTarget = getBlockGroups; globalThis.signatureTarget = buildDaySignature;', context);
 
   const sheetData = [
     ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
     [new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', 'N/A', ''],
     ['', '', 'Side Planks', '2', '1:00', 'N/A', 'each side'],
-    ['', '', '', '', '', '', '']
+    ['', '', '', '', '', '', ''],
+    [new Date(2026, 8, 17), 'Upper Body', 'Bench Press', '3', '10', '135 lbs', '']
   ];
 
-  const signatures = context.signaturesTarget(sheetData);
-  const rebuiltSignature = context.signatureTarget('2026-09-16', [
+  const block = context.findBlockTarget(sheetData, '2026-09-16');
+  assert.deepEqual(JSON.parse(JSON.stringify(block)), { startRowIndex: 1, rowCount: 2 });
+
+  const groups = context.blockGroupsTarget(sheetData, block);
+  assert.equal(context.signatureTarget('2026-09-16', groups), context.signatureTarget('2026-09-16', [
     { category: 'Core', exercises: [
       { workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
       { workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
     ] }
-  ]);
+  ]));
 
-  assert.ok(signatures.has(rebuiltSignature));
+  assert.equal(context.findBlockTarget(sheetData, '2026-09-18'), null);
+});
+
+test('overwrites a day already recorded when its exercises change', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+  writeFileSync(fixturePath, JSON.stringify({ sheets: {} }));
+
+  try {
+    const runUpdate = (description) => {
+      const mock = createGoogleSheetsMock(fixturePath, outputPath);
+      const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+      const source = [
+        readFileSync('DateUtils.js', 'utf8'),
+        readFileSync('RunningMetrics.js', 'utf8'),
+        readFileSync('InjuryReport.js', 'utf8'),
+        readFileSync('SupplementalWorkouts.js', 'utf8')
+      ].join('\n');
+      vm.runInContext(source, context);
+      vm.runInContext(
+        'updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), globalThis.__activities)',
+        Object.assign(context, { __activities: [{
+          start_date_local: '2026-09-16T13:00:00Z',
+          description
+        }] })
+      );
+      mock.save();
+      const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+      writeFileSync(fixturePath, JSON.stringify({ sheets: saved.sheets }));
+      return saved.sheets['Supplemental Workouts'].values;
+    };
+
+    const firstValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (1x1:00)');
+    assert.equal(firstValues.length, 3);
+    assert.equal(firstValues[1][3], '1');
+
+    const secondValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (2x1:30)\n2. Side Planks (2x1:00, each side)');
+    assert.equal(secondValues.length, 4);
+    assert.equal(secondValues[1][3], '2');
+    assert.equal(secondValues[2][2], 'Side Planks');
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
