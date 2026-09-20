@@ -66,7 +66,8 @@ function getBlockGroups(sheetData, block) {
   return groups;
 }
 
-function findDayBlock(sheetData, dateKey) {
+function getAllDayBlocks(sheetData) {
+  const blocks = [];
   let blockStartIndex = null;
 
   for (let rowIndex = 1; rowIndex <= sheetData.length; rowIndex++) {
@@ -75,10 +76,7 @@ function findDayBlock(sheetData, dateKey) {
 
     if (isBoundary) {
       if (blockStartIndex !== null) {
-        const blockDate = parseSheetDate(sheetData[blockStartIndex][0]);
-        if (blockDate && getDateKey(blockDate) === dateKey) {
-          return { startRowIndex: blockStartIndex, rowCount: rowIndex - blockStartIndex };
-        }
+        blocks.push({ startRowIndex: blockStartIndex, rowCount: rowIndex - blockStartIndex });
         blockStartIndex = null;
       }
       continue;
@@ -87,7 +85,51 @@ function findDayBlock(sheetData, dateKey) {
     if (blockStartIndex === null) blockStartIndex = rowIndex;
   }
 
-  return null;
+  return blocks;
+}
+
+function getBlockDateKey(sheetData, block) {
+  const blockDate = parseSheetDate(sheetData[block.startRowIndex][0]);
+  return blockDate ? getDateKey(blockDate) : null;
+}
+
+function findDayBlock(sheetData, dateKey) {
+  return getAllDayBlocks(sheetData).find(block => getBlockDateKey(sheetData, block) === dateKey) || null;
+}
+
+function findChronologicalInsertionRowIndex(sheetData, dateKey) {
+  const nextBlock = getAllDayBlocks(sheetData).find(block => {
+    const blockDateKey = getBlockDateKey(sheetData, block);
+    return blockDateKey && blockDateKey > dateKey;
+  });
+  return nextBlock ? nextBlock.startRowIndex : null;
+}
+
+function sortDayBlocksIfNeeded(sheet, sheetData) {
+  const blocks = getAllDayBlocks(sheetData);
+  const blockDateKeys = blocks.map(block => getBlockDateKey(sheetData, block));
+  const isAlreadySorted = blockDateKeys.every((dateKey, index) => index === 0 || blockDateKeys[index - 1] <= dateKey);
+  if (isAlreadySorted) return;
+
+  const orderedBlocks = blocks
+    .map(block => ({
+      activityDate: sheetData[block.startRowIndex][0],
+      dateKey: getBlockDateKey(sheetData, block),
+      groups: getBlockGroups(sheetData, block)
+    }))
+    .sort((left, right) => (left.dateKey < right.dateKey ? -1 : left.dateKey > right.dateKey ? 1 : 0));
+
+  const firstBlockRowIndex = Math.min(...blocks.map(block => block.startRowIndex));
+  sheet.deleteRows(firstBlockRowIndex + 1, sheetData.length - firstBlockRowIndex);
+
+  let rowIndex = firstBlockRowIndex;
+  orderedBlocks.forEach(({ activityDate, groups }) => {
+    groups.forEach(group => {
+      rowIndex = writeSupplementalWorkoutGroup(sheet, rowIndex, activityDate, group);
+    });
+    writeSeparatorRow(sheet, rowIndex);
+    rowIndex++;
+  });
 }
 
 function findAppendRowIndex(sheet, sheetData) {
@@ -130,6 +172,15 @@ function writeSeparatorRow(sheet, rowIndex) {
   sheet.setRowHeight(rowIndex + 1, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
+function repairSeparatorRows(sheet, sheetData) {
+  // Separator rows written before a column (e.g. Exercise, Weight) existed only got painted
+  // up to the column count at that time; repaint every one across all current columns.
+  sheetData.slice(1).forEach((row, index) => {
+    if (!isBlankRow(row)) return;
+    writeSeparatorRow(sheet, index + 1);
+  });
+}
+
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME)
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
@@ -149,12 +200,22 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
       const existingSignature = buildDaySignature(dateKey, getBlockGroups(sheetData, existingBlock));
       if (existingSignature === daySignature) return;
 
-      // Overwrite: drop the day's old rows (plus its trailing separator) and re-append fresh ones.
+      // Overwrite: drop the day's old rows (plus its trailing separator) before re-inserting fresh ones.
       sheet.deleteRows(existingBlock.startRowIndex + 1, existingBlock.rowCount + 1);
       sheetData = sheet.getDataRange().getValues();
     }
 
-    let rowIndex = findAppendRowIndex(sheet, sheetData);
+    const rowsNeeded = groups.reduce((sum, group) => sum + group.exercises.length, 0) + 1;
+    const insertionRowIndex = findChronologicalInsertionRowIndex(sheetData, dateKey);
+
+    let rowIndex;
+    if (insertionRowIndex === null) {
+      rowIndex = findAppendRowIndex(sheet, sheetData);
+    } else {
+      sheet.insertRows(insertionRowIndex + 1, rowsNeeded);
+      rowIndex = insertionRowIndex;
+    }
+
     groups.forEach(group => {
       rowIndex = writeSupplementalWorkoutGroup(sheet, rowIndex, activityDate, group);
     });
@@ -162,6 +223,10 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
     sheetData = sheet.getDataRange().getValues();
   });
+
+  sortDayBlocksIfNeeded(sheet, sheetData);
+  sheetData = sheet.getDataRange().getValues();
+  repairSeparatorRows(sheet, sheetData);
 
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)

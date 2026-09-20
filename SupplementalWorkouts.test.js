@@ -133,3 +133,130 @@ test('overwrites a day already recorded when its exercises change', () => {
     rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('keeps day blocks in chronological order even when activities arrive out of order', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-order-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+  writeFileSync(fixturePath, JSON.stringify({ sheets: {} }));
+
+  try {
+    const runUpdate = (activities) => {
+      const mock = createGoogleSheetsMock(fixturePath, outputPath);
+      const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+      const source = [
+        readFileSync('DateUtils.js', 'utf8'),
+        readFileSync('RunningMetrics.js', 'utf8'),
+        readFileSync('InjuryReport.js', 'utf8'),
+        readFileSync('SupplementalWorkouts.js', 'utf8')
+      ].join('\n');
+      vm.runInContext(source, context);
+      vm.runInContext(
+        'updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), globalThis.__activities)',
+        Object.assign(context, { __activities: activities })
+      );
+      mock.save();
+      const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+      writeFileSync(fixturePath, JSON.stringify({ sheets: saved.sheets }));
+      return saved.sheets['Supplemental Workouts'].values;
+    };
+
+    // 9/17 is recorded first, then a later sync processes 9/15 (e.g. an edited older activity).
+    runUpdate([{
+      start_date_local: '2026-09-17T13:00:00Z',
+      description: 'Supplemental Workouts:\nUpper Body\n1. Bench Press (3x8)'
+    }]);
+    const values = runUpdate([{
+      start_date_local: '2026-09-15T13:00:00Z',
+      description: 'Supplemental Workouts:\nCore\n1. Planks (1x1:00)'
+    }]);
+
+    const dateCells = values.slice(1).map(row => row[0]).filter(Boolean);
+    assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('repaints a separator row that was only painted for an older, smaller column count', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-repair-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+
+  writeFileSync(fixturePath, JSON.stringify({
+    sheets: {
+      'Supplemental Workouts': {
+        values: [
+          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+          ['2026-09-15T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+          []
+        ],
+        // Simulates a separator row written back when the sheet only had 4 columns.
+        styles: { '3,1': { background: '#000000' }, '3,2': { background: '#000000' }, '3,3': { background: '#000000' }, '3,4': { background: '#000000' } }
+      }
+    }
+  }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+    const source = [
+      readFileSync('DateUtils.js', 'utf8'),
+      readFileSync('RunningMetrics.js', 'utf8'),
+      readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SupplementalWorkouts.js', 'utf8')
+    ].join('\n');
+    vm.runInContext(source, context);
+    vm.runInContext('updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), [])', context);
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    const styles = saved.sheets['Supplemental Workouts'].styles;
+    for (let column = 1; column <= 7; column++) {
+      assert.equal(styles[`3,${column}`]?.background, '#000000', `column ${column} should be repainted black`);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('re-sorts an already out-of-order sheet even with no new activities', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-resort-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+
+  writeFileSync(fixturePath, JSON.stringify({
+    sheets: {
+      'Supplemental Workouts': {
+        values: [
+          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+          ['2026-09-17T04:00:00.000Z', 'Upper Body', 'Bench Press', '3', '8', 'N/A', ''],
+          [],
+          ['2026-09-15T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+          []
+        ]
+      }
+    }
+  }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+    const source = [
+      readFileSync('DateUtils.js', 'utf8'),
+      readFileSync('RunningMetrics.js', 'utf8'),
+      readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SupplementalWorkouts.js', 'utf8')
+    ].join('\n');
+    vm.runInContext(source, context);
+    vm.runInContext('updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), [])', context);
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    const values = saved.sheets['Supplemental Workouts'].values;
+    const dateCells = values.slice(1).map(row => row[0]).filter(Boolean);
+    assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});

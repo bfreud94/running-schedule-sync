@@ -53,6 +53,28 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
 
         changes.push({ sheet: name, row: startRow, property: 'deleteRows', value: numRows });
       },
+      insertRows(startRow, numRows) {
+        sheet.values.splice(startRow - 1, 0, ...Array.from({ length: numRows }, () => []));
+
+        const shiftRow = row => (row >= startRow ? row + numRows : row);
+
+        const shiftedStyles = {};
+        Object.entries(sheet.styles).forEach(([key, value]) => {
+          const [row, column] = key.split(',').map(Number);
+          shiftedStyles[`${shiftRow(row)},${column}`] = value;
+        });
+        sheet.styles = shiftedStyles;
+
+        const shiftedRowHeights = {};
+        Object.entries(sheet.rowHeights).forEach(([rowKey, value]) => {
+          shiftedRowHeights[shiftRow(Number(rowKey))] = value;
+        });
+        sheet.rowHeights = shiftedRowHeights;
+
+        sheet.mergedRanges = sheet.mergedRanges.map(range => ({ ...range, row: shiftRow(range.row) }));
+
+        changes.push({ sheet: name, row: startRow, property: 'insertRows', value: numRows });
+      },
       getDataRange: () => ({
         getValues: () => sheet.values.map(row => [...row])
       }),
