@@ -150,18 +150,19 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)
-    .setVerticalAlignment('middle');
+    .setVerticalAlignment('middle')
+    .setHorizontalAlignment('left');
   if (sheetData.length > 1) {
     sheet.getRange(2, 1, sheetData.length - 1, 2)
       .setVerticalAlignment('top')
       .setHorizontalAlignment('left');
   }
   sheet.getRange(1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length).setFontWeight('bold');
-  sheet.setColumnWidth(1, 120);
-  sheet.setColumnWidth(2, 130);
-  sheet.setColumnWidth(3, 170);
+  sheet.setColumnWidth(1, 150);
+  sheet.setColumnWidth(2, 150);
+  sheet.setColumnWidth(3, 200);
   sheet.setColumnWidth(4, 70);
   sheet.setColumnWidth(5, 140);
-  sheet.setColumnWidth(6, 110);
+  sheet.setColumnWidth(6, 150);
   sheet.setColumnWidth(7, 220);
 }
