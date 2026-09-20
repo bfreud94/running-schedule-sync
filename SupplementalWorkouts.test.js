@@ -220,6 +220,49 @@ test('repaints a separator row that was only painted for an older, smaller colum
   }
 });
 
+test('repaints a separator row even when a stray merged value keeps it from reading as fully blank', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-repair-merge-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+
+  writeFileSync(fixturePath, JSON.stringify({
+    sheets: {
+      'Supplemental Workouts': {
+        // Column A on row 3 still carries the merged date value from the block above it,
+        // so it doesn't read as a blank row even though it's meant to be the separator.
+        values: [
+          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+          ['2026-09-15T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+          ['2026-09-15T04:00:00.000Z', '', '', '', '', '', '']
+        ],
+        styles: { '3,1': { background: '#000000' }, '3,2': { background: '#000000' } }
+      }
+    }
+  }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+    const source = [
+      readFileSync('DateUtils.js', 'utf8'),
+      readFileSync('RunningMetrics.js', 'utf8'),
+      readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SupplementalWorkouts.js', 'utf8')
+    ].join('\n');
+    vm.runInContext(source, context);
+    vm.runInContext('updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), [])', context);
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    const styles = saved.sheets['Supplemental Workouts'].styles;
+    for (let column = 1; column <= 7; column++) {
+      assert.equal(styles[`3,${column}`]?.background, '#000000', `column ${column} should be repainted black`);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
 test('re-sorts an already out-of-order sheet even with no new activities', () => {
   const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-resort-'));
   const fixturePath = path.join(tempDir, 'spreadsheet.json');

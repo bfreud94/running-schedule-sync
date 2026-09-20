@@ -175,9 +175,15 @@ function writeSeparatorRow(sheet, rowIndex) {
 function repairSeparatorRows(sheet, sheetData) {
   // Separator rows written before a column (e.g. Exercise, Weight) existed only got painted
   // up to the column count at that time; repaint every one across all current columns.
+  // A stray merge from before a column existed can also leave a "blank" row reading as
+  // non-blank, so also treat an already-black column A as a separator signal.
   sheetData.slice(1).forEach((row, index) => {
-    if (!isBlankRow(row)) return;
-    writeSeparatorRow(sheet, index + 1);
+    const rowIndex = index + 1;
+    const looksBlank = isBlankRow(row);
+    const alreadyMarkedAsSeparator = sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+    if (!looksBlank && !alreadyMarkedAsSeparator) return;
+
+    writeSeparatorRow(sheet, rowIndex);
   });
 }
 
