@@ -81,3 +81,28 @@ test('appends a new week row when the current week is missing', () => {
   assert.equal(context.appendTarget(sheet, rows, new Date(2026, 8, 14)), 2);
   assert.deepEqual(writes, [{ row: 3, column: 1, value: 'WEEK 3 (9/14)' }]);
 });
+
+test('appends the new week row directly below the last populated row, ignoring trailing blanks', () => {
+  const writes = [];
+  const sheet = {
+    getRange: (row, column) => ({
+      getValue: () => '',
+      setValue: value => { writes.push({ row, column, value }); }
+    })
+  };
+  const context = vm.createContext({ console });
+  const dateSource = readFileSync('DateUtils.js', 'utf8');
+  const sheetSource = readFileSync('SheetUtils.js', 'utf8');
+
+  vm.runInContext(`${dateSource}\n${sheetSource}\nglobalThis.appendTarget = appendWeekRow;`, context);
+
+  const rows = [
+    ['WEEK 1 (8/31)', '3 miles'],
+    ['WEEK 2 (9/7)', '4 miles'],
+    ['', ''],
+    ['', ''],
+    ['', '']
+  ];
+  assert.equal(context.appendTarget(sheet, rows, new Date(2026, 8, 14)), 2);
+  assert.deepEqual(writes, [{ row: 3, column: 1, value: 'WEEK 3 (9/14)' }]);
+});

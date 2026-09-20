@@ -27,8 +27,16 @@ function getNextWeekNumber(sheetData, targetMonday) {
   return 1;
 }
 
+function getLastPopulatedRowIndex(sheetData) {
+  for (let rowIndex = sheetData.length - 1; rowIndex >= 0; rowIndex--) {
+    if (sheetData[rowIndex].some(value => String(value || '').trim() !== '')) return rowIndex;
+  }
+  return -1;
+}
+
 function appendWeekRow(actualSheet, sheetData, targetMonday) {
-  const rowIndex = sheetData.length;
+  // Trailing blank rows in the data range shouldn't push the new week further down.
+  const rowIndex = getLastPopulatedRowIndex(sheetData) + 1;
   const weekLabel = formatWeekLabel(getNextWeekNumber(sheetData, targetMonday), targetMonday);
   actualSheet.getRange(rowIndex + 1, 1).setValue(weekLabel);
 
