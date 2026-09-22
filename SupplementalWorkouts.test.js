@@ -18,7 +18,7 @@ function loadContext() {
 }
 
 test('fills E:G for rows containing a black separator cell in A:D', () => {
-  const backgrounds = { '3,2': '#000000' };
+  const backgrounds = { '3,2': '#000000', '4,1': '#000000' };
   const fills = [];
   const sheet = {
     getRange(row, column, numRows = 1, numColumns = 1) {
@@ -40,7 +40,10 @@ test('fills E:G for rows containing a black separator cell in A:D', () => {
     ['', '', '', '', '', '', '']
   ]);
 
-  assert.deepEqual(fills, [{ row: 3, column: 5, numRows: 1, numColumns: 3, value: '#000000' }]);
+  assert.deepEqual(fills, [
+    { row: 3, column: 5, numRows: 1, numColumns: 3, value: '#000000' },
+    { row: 4, column: 5, numRows: 1, numColumns: 3, value: '#000000' }
+  ]);
 });
 
 test('groups exercises by category, preserving first-seen order', () => {

@@ -168,7 +168,7 @@ function writeSeparatorRow(sheet, rowIndex) {
 }
 
 function fillMissingSeparatorColumns(sheet, sheetData) {
-  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+  const repaintIfSeparator = rowIndex => {
     const sheetRow = rowIndex + 1;
     const hasBlackSeparatorCell = [1, 2, 3, 4].some(column =>
       sheet.getRange(sheetRow, column).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND
@@ -177,7 +177,14 @@ function fillMissingSeparatorColumns(sheet, sheetData) {
       sheet.getRange(sheetRow, 5, 1, 3)
         .setBackground(SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND);
     }
+  };
+
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    repaintIfSeparator(rowIndex);
   }
+
+  // A trailing formatting-only separator may be omitted from getDataRange().
+  repaintIfSeparator(sheetData.length);
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
