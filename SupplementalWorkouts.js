@@ -192,6 +192,14 @@ function repairSeparatorRows(sheet, sheetData) {
     writeSeparatorRow(sheet, trailingRowIndex);
     trailingRowIndex++;
   }
+
+  if (!sheet.getMaxRows) return;
+
+  for (let rowIndex = sheetData.length; rowIndex < sheet.getMaxRows(); rowIndex++) {
+    if (sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
+      writeSeparatorRow(sheet, rowIndex);
+    }
+  }
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
