@@ -37,7 +37,7 @@ function buildDaySignature(dateKey, groups) {
 }
 
 function isBlankRow(row) {
-  return row.every(value => String(value || '').trim() === '');
+  return !row || row.every(value => String(value || '').trim() === '');
 }
 
 function getBlockGroups(sheetData, block) {
@@ -89,7 +89,7 @@ function getAllDayBlocks(sheetData) {
 }
 
 function getBlockDateKey(sheetData, block) {
-  const blockDate = parseSheetDate(sheetData[block.startRowIndex][0]);
+  const blockDate = parseSheetDate(sheetData[block.startRowIndex]?.[0]);
   return blockDate ? getDateKey(blockDate) : null;
 }
 
@@ -185,6 +185,13 @@ function repairSeparatorRows(sheet, sheetData) {
 
     writeSeparatorRow(sheet, rowIndex);
   });
+
+  // Production can omit a trailing formatting-only row from getDataRange().
+  let trailingRowIndex = sheetData.length;
+  while (sheet.getRange(trailingRowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
+    writeSeparatorRow(sheet, trailingRowIndex);
+    trailingRowIndex++;
+  }
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {

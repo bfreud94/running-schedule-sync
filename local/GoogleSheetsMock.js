@@ -81,12 +81,12 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
       getRange(row, column, numRows = 1, numColumns = 1) {
         const rowIndex = row - 1;
         const columnIndex = column - 1;
-        sheet.values[rowIndex] ||= [];
 
         return {
-          getValue: () => sheet.values[rowIndex][columnIndex],
+          getValue: () => sheet.values[rowIndex]?.[columnIndex],
           getBackground: () => sheet.styles[`${row},${column}`]?.background || '#ffffff',
           setValue(value) {
+            sheet.values[rowIndex] ||= [];
             const previousValue = sheet.values[rowIndex][columnIndex];
             sheet.values[rowIndex][columnIndex] = value;
             changes.push({ sheet: name, row, column, property: 'value', previousValue, value });

@@ -122,11 +122,11 @@ test('overwrites a day already recorded when its exercises change', () => {
     };
 
     const firstValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (1x1:00)');
-    assert.equal(firstValues.length, 3);
+    assert.equal(firstValues.length, 2);
     assert.equal(firstValues[1][3], '1');
 
     const secondValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (2x1:30)\n2. Side Planks (2x1:00, each side)');
-    assert.equal(secondValues.length, 4);
+    assert.equal(secondValues.length, 3);
     assert.equal(secondValues[1][3], '2');
     assert.equal(secondValues[2][2], 'Side Planks');
   } finally {
@@ -171,7 +171,7 @@ test('keeps day blocks in chronological order even when activities arrive out of
       description: 'Supplemental Workouts:\nCore\n1. Planks (1x1:00)'
     }]);
 
-    const dateCells = values.slice(1).map(row => row[0]).filter(Boolean);
+    const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
     assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
@@ -297,7 +297,7 @@ test('re-sorts an already out-of-order sheet even with no new activities', () =>
 
     const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
     const values = saved.sheets['Supplemental Workouts'].values;
-    const dateCells = values.slice(1).map(row => row[0]).filter(Boolean);
+    const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
     assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
