@@ -45,6 +45,57 @@ test('backfills workout text into an existing miles cell', () => {
   assert.equal(writtenValue, '6.21 miles\n1000m repeats');
 });
 
+test('removes bold formatting when writing the current day cell', () => {
+  let fontWeight;
+  const sheet = {
+    getRange() {
+      return {
+        getValue: () => '',
+        setValue: () => {},
+        setFontWeight: value => { fontWeight = value; },
+        setBackground: () => {},
+        setFontColor: () => {}
+      };
+    }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('SheetUtils.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.updateTarget = updateDailyCells;`, context);
+  context.updateTarget(sheet, 0, null, [5], [['10 min easy']], 0);
+
+  assert.equal(fontWeight, 'normal');
+});
+
+test('calculates total mileage from the current row daily cells', () => {
+  const values = {
+    '2,2': '4 miles',
+    '2,3': '5.25 miles',
+    '2,4': 'Rest',
+    '2,5': '3 miles',
+    '2,6': '6 miles',
+    '2,7': 'Rest',
+    '2,8': '7 miles',
+    '2,9': '999 miles',
+    '1,2': '100 miles'
+  };
+  let totalValue;
+  const sheet = {
+    getRange: (row, column) => ({
+      getValue: () => values[`${row},${column}`] || '',
+      setValue: value => { if (row === 2 && column === 9) totalValue = value; },
+      setBackground: () => {},
+      setFontColor: () => {}
+    })
+  };
+  const context = vm.createContext({ console });
+  const source = `${readFileSync('RunningMetrics.js', 'utf8')}\n${readFileSync('SheetUtils.js', 'utf8')}`;
+
+  vm.runInContext(`${source}\nglobalThis.totalTarget = updateTotalCell;`, context);
+  assert.equal(context.totalTarget(sheet, 1, null), 25.25);
+  assert.equal(totalValue, '25.25 miles');
+});
+
 test('finds the planned row by week instead of row position', () => {
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');

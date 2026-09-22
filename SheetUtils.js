@@ -92,6 +92,7 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
     const stravaMiles = Math.floor(dailyMiles[dayIndex] * 100) / 100;
     const milesText = stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`;
     targetCell.setValue(workoutText ? `${milesText}\n${workoutText}` : milesText);
+    if (targetCell.setFontWeight) targetCell.setFontWeight('normal');
 
     if (plannedRow) {
       applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], stravaMiles));
@@ -101,7 +102,12 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
 
 function updateTotalCell(actualSheet, rowIndex, plannedRow) {
   const totalCell = actualSheet.getRange(rowIndex + 1, 9);
-  const actualTotalMiles = parseMilesFromCell(totalCell.getValue());
+  let actualTotalMiles = 0;
+  for (let column = 2; column <= 8; column++) {
+    actualTotalMiles += parseMilesFromCell(actualSheet.getRange(rowIndex + 1, column).getValue());
+  }
+  actualTotalMiles = Math.floor(actualTotalMiles * 100) / 100;
+  totalCell.setValue(`${actualTotalMiles} miles`);
 
   if (plannedRow) {
     const plannedTotalMiles = parseMilesFromCell(plannedRow[8]);
