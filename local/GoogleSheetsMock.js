@@ -24,12 +24,6 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         sheet.rowHeights[row] = height;
         changes.push({ sheet: name, row, property: 'rowHeight', value: height });
       },
-      getMaxRows() {
-        return Math.max(sheet.values.length, ...Object.keys(sheet.rowHeights).map(Number), 1);
-      },
-      getRowHeight(row) {
-        return sheet.rowHeights[row] || 21;
-      },
       deleteRows(startRow, numRows) {
         sheet.values.splice(startRow - 1, numRows);
 

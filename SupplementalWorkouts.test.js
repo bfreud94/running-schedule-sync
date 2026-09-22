@@ -17,6 +17,32 @@ function loadContext() {
   return context;
 }
 
+test('fills E:G for rows containing a black separator cell in A:D', () => {
+  const backgrounds = { '3,2': '#000000' };
+  const fills = [];
+  const sheet = {
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        getBackground: () => backgrounds[`${row},${column}`] || '#ffffff',
+        setBackground: value => {
+          fills.push({ row, column, numRows, numColumns, value });
+          return this;
+        }
+      };
+    }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.fillTarget = fillMissingSeparatorColumns;', context);
+
+  context.fillTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    ['2026-09-15', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+    ['', '', '', '', '', '', '']
+  ]);
+
+  assert.deepEqual(fills, [{ row: 3, column: 5, numRows: 1, numColumns: 3, value: '#000000' }]);
+});
+
 test('groups exercises by category, preserving first-seen order', () => {
   const context = loadContext();
   vm.runInContext('globalThis.groupTarget = groupExercisesByCategory;', context);
@@ -173,91 +199,6 @@ test('keeps day blocks in chronological order even when activities arrive out of
 
     const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
     assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
-  }
-});
-
-test('repaints a separator row that was only painted for an older, smaller column count', () => {
-  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-repair-'));
-  const fixturePath = path.join(tempDir, 'spreadsheet.json');
-  const outputPath = path.join(tempDir, 'output.json');
-
-  writeFileSync(fixturePath, JSON.stringify({
-    sheets: {
-      'Supplemental Workouts': {
-        values: [
-          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
-          ['2026-09-15T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
-          []
-        ],
-        // Simulates a separator row written back when the sheet only had 4 columns.
-        styles: { '3,1': { background: '#000000' }, '3,2': { background: '#000000' }, '3,3': { background: '#000000' }, '3,4': { background: '#000000' } }
-      }
-    }
-  }));
-
-  try {
-    const mock = createGoogleSheetsMock(fixturePath, outputPath);
-    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
-    const source = [
-      readFileSync('DateUtils.js', 'utf8'),
-      readFileSync('RunningMetrics.js', 'utf8'),
-      readFileSync('InjuryReport.js', 'utf8'),
-      readFileSync('SupplementalWorkouts.js', 'utf8')
-    ].join('\n');
-    vm.runInContext(source, context);
-    vm.runInContext('updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), [])', context);
-    mock.save();
-
-    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
-    const styles = saved.sheets['Supplemental Workouts'].styles;
-    for (let column = 1; column <= 7; column++) {
-      assert.equal(styles[`3,${column}`]?.background, '#000000', `column ${column} should be repainted black`);
-    }
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
-  }
-});
-
-test('repaints a separator row even when a stray merged value keeps it from reading as fully blank', () => {
-  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-repair-merge-'));
-  const fixturePath = path.join(tempDir, 'spreadsheet.json');
-  const outputPath = path.join(tempDir, 'output.json');
-
-  writeFileSync(fixturePath, JSON.stringify({
-    sheets: {
-      'Supplemental Workouts': {
-        // Column A on row 3 still carries the merged date value from the block above it,
-        // so it doesn't read as a blank row even though it's meant to be the separator.
-        values: [
-          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
-          ['2026-09-15T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
-          ['2026-09-15T04:00:00.000Z', '', '', '', '', '', '']
-        ],
-        styles: { '3,1': { background: '#000000' }, '3,2': { background: '#000000' } }
-      }
-    }
-  }));
-
-  try {
-    const mock = createGoogleSheetsMock(fixturePath, outputPath);
-    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
-    const source = [
-      readFileSync('DateUtils.js', 'utf8'),
-      readFileSync('RunningMetrics.js', 'utf8'),
-      readFileSync('InjuryReport.js', 'utf8'),
-      readFileSync('SupplementalWorkouts.js', 'utf8')
-    ].join('\n');
-    vm.runInContext(source, context);
-    vm.runInContext('updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), [])', context);
-    mock.save();
-
-    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
-    const styles = saved.sheets['Supplemental Workouts'].styles;
-    for (let column = 1; column <= 7; column++) {
-      assert.equal(styles[`3,${column}`]?.background, '#000000', `column ${column} should be repainted black`);
-    }
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

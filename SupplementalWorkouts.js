@@ -167,17 +167,17 @@ function writeSeparatorRow(sheet, rowIndex) {
   sheet.setRowHeight(rowIndex + 1, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
-function repairSeparatorRows(sheet, sheetData) {
-  getAllDayBlocks(sheetData).forEach(block => {
-    writeSeparatorRow(sheet, block.startRowIndex + block.rowCount);
-  });
-
-  sheetData.slice(1).forEach((row, index) => {
-    const rowIndex = index + 1;
-    if (sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
-      writeSeparatorRow(sheet, rowIndex);
+function fillMissingSeparatorColumns(sheet, sheetData) {
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    const sheetRow = rowIndex + 1;
+    const hasBlackSeparatorCell = [1, 2, 3, 4].some(column =>
+      sheet.getRange(sheetRow, column).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND
+    );
+    if (hasBlackSeparatorCell) {
+      sheet.getRange(sheetRow, 5, 1, 3)
+        .setBackground(SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND);
     }
-  });
+  }
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
@@ -225,7 +225,7 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
-  repairSeparatorRows(sheet, sheetData);
+  fillMissingSeparatorColumns(sheet, sheetData);
 
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)
