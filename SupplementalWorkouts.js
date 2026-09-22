@@ -133,12 +133,8 @@ function sortDayBlocksIfNeeded(sheet, sheetData) {
 }
 
 function findAppendRowIndex(sheet, sheetData) {
-  // Separator rows hold no values, so the data range can stop short of them.
-  let rowIndex = sheetData.length;
-  while (sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
-    rowIndex++;
-  }
-  return rowIndex;
+  // A trailing separator can be omitted from getDataRange(); reuse that row when appending.
+  return sheetData.length;
 }
 
 function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group) {
