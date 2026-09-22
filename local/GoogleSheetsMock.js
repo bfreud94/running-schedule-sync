@@ -116,9 +116,15 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             return this;
           },
           setBackground(value) {
-            sheet.styles[`${row},${column}`] ||= {};
-            sheet.styles[`${row},${column}`].background = value;
-            changes.push({ sheet: name, row, column, property: 'background', value });
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                sheet.styles[`${targetRow},${targetColumn}`].background = value;
+                changes.push({ sheet: name, row: targetRow, column: targetColumn, property: 'background', value });
+              }
+            }
             return this;
           },
           setFontColor(value) {

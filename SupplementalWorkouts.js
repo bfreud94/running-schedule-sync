@@ -166,40 +166,22 @@ function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group
 }
 
 function writeSeparatorRow(sheet, rowIndex) {
-  for (let column = 1; column <= SUPPLEMENTAL_WORKOUTS_HEADERS.length; column++) {
-    sheet.getRange(rowIndex + 1, column).setBackground(SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND);
-  }
+  sheet.getRange(rowIndex + 1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length)
+    .setBackground(SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND);
   sheet.setRowHeight(rowIndex + 1, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
 function repairSeparatorRows(sheet, sheetData) {
-  // Separator rows written before a column (e.g. Exercise, Weight) existed only got painted
-  // up to the column count at that time; repaint every one across all current columns.
-  // A stray merge from before a column existed can also leave a "blank" row reading as
-  // non-blank, so also treat an already-black column A as a separator signal.
-  sheetData.slice(1).forEach((row, index) => {
-    const rowIndex = index + 1;
-    const looksBlank = isBlankRow(row);
-    const alreadyMarkedAsSeparator = sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
-    if (!looksBlank && !alreadyMarkedAsSeparator) return;
-
-    writeSeparatorRow(sheet, rowIndex);
+  getAllDayBlocks(sheetData).forEach(block => {
+    writeSeparatorRow(sheet, block.startRowIndex + block.rowCount);
   });
 
-  // Production can omit a trailing formatting-only row from getDataRange().
-  let trailingRowIndex = sheetData.length;
-  while (sheet.getRange(trailingRowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
-    writeSeparatorRow(sheet, trailingRowIndex);
-    trailingRowIndex++;
-  }
-
-  if (!sheet.getMaxRows) return;
-
-  for (let rowIndex = sheetData.length; rowIndex < sheet.getMaxRows(); rowIndex++) {
+  sheetData.slice(1).forEach((row, index) => {
+    const rowIndex = index + 1;
     if (sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND) {
       writeSeparatorRow(sheet, rowIndex);
     }
-  }
+  });
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
