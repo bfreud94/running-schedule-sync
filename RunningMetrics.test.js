@@ -95,3 +95,49 @@ test('normalizes an Area-prefixed category line and detects weights mentioned in
     { category: 'Upper Body Lift', workout: 'Overhead Press', sets: '3', repsHoldTime: '6', weight: '45 lbs', notes: '' }
   ]);
 });
+
+test('parses semicolon-separated sets with per-set reps and weights', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('RunningMetrics.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.detailsTarget = parseSupplementalWorkoutDetails;`, context);
+
+  const details = JSON.parse(JSON.stringify(context.detailsTarget([
+    'Supplemental Workouts:',
+    'Upper Body:',
+    '1. Bench Press (3 sets; 10 reps @ 80 lbs, 8 reps @ 85 lbs, 7 reps @ 90 lbs)'
+  ].join('\n'))));
+
+  assert.deepEqual(details.exercises, [
+    {
+      category: 'Upper Body',
+      workout: 'Bench Press',
+      sets: '3',
+      repsHoldTime: '10\n8\n7',
+      weight: '80 lbs\n85 lbs\n90 lbs',
+      notes: ''
+    }
+  ]);
+});
+
+test('keeps multiple supplemental areas separated by a blank line', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('RunningMetrics.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.detailsTarget = parseSupplementalWorkoutDetails;`, context);
+
+  const details = JSON.parse(JSON.stringify(context.detailsTarget([
+    'Supplemental Workouts:',
+    'Area: Upper Body Lift',
+    '1. Bench Press (3 sets; 10 reps @ 80 lbs, 8 reps @ 85 lbs, 7 reps @ 90 lbs)',
+    '',
+    'Area: Accessory Exercises',
+    '1. Leg Lifts (2x10)',
+    '',
+    'Injury Report:',
+    'Area: Left Calf'
+  ].join('\n'))));
+
+  assert.deepEqual(details.categories, ['Upper Body Lift', 'Accessory Exercises']);
+  assert.deepEqual(details.exercises.map(exercise => exercise.category), ['Upper Body Lift', 'Accessory Exercises']);
+});

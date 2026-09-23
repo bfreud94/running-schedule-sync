@@ -24,7 +24,7 @@ function parseSupplementalWorkoutSection(description) {
 
   const sectionLines = [];
   for (const line of match[1].split(/\r?\n/)) {
-    if (!line.trim()) break;
+    if (/^(?:injury report|workout|splits|supplemental workouts?):\s*$/i.test(line.trim())) break;
     sectionLines.push(line);
   }
   return sectionLines.join('\n');
@@ -40,6 +40,34 @@ function parseSupplementalExerciseLine(line, category) {
 
   const workout = match[1].trim();
   const details = String(match[2] || '').trim();
+  const structuredSetsMatch = details.match(/^(\d+)\s+sets?\s*;\s*(.+)$/i);
+  if (structuredSetsMatch) {
+    const setDetails = structuredSetsMatch[2].split(',').map(part => part.trim()).filter(Boolean);
+    const reps = [];
+    const weights = [];
+    const notes = [];
+
+    setDetails.forEach(detail => {
+      const setMatch = detail.match(/^(.+?)\s+reps?\s*@\s*(.+)$/i);
+      if (!setMatch) {
+        notes.push(detail);
+        return;
+      }
+
+      reps.push(setMatch[1].trim());
+      weights.push(setMatch[2].trim());
+    });
+
+    return {
+      category,
+      workout,
+      sets: structuredSetsMatch[1],
+      repsHoldTime: reps.length ? reps.join('\n') : '',
+      weight: weights.length ? weights.join('\n') : 'N/A',
+      notes: notes.join(', ')
+    };
+  }
+
   const detailParts = details ? details.split(',').map(part => part.trim()).filter(Boolean) : [];
   const setsAndRepsMatch = (detailParts.shift() || '').match(/^(\d+)\s*x\s*(.+)$/i);
 
