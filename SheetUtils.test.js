@@ -114,10 +114,13 @@ test('finds the planned row by week instead of row position', () => {
 test('appends a new week row when the current week is missing', () => {
   const writes = [];
   const sheet = {
-    getRange: (row, column) => ({
+    getRange(row, column) {
+      return {
       getValue: () => '',
-      setValue: value => { writes.push({ row, column, value }); }
-    })
+        setValue(value) { writes.push({ row, column, value }); return this; },
+        setFontWeight(value) { writes.push({ row, column, property: 'fontWeight', value }); return this; }
+      };
+    }
   };
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');
@@ -130,16 +133,22 @@ test('appends a new week row when the current week is missing', () => {
     ['WEEK 2 (9/7)', '4 miles']
   ];
   assert.equal(context.appendTarget(sheet, rows, new Date(2026, 8, 14)), 2);
-  assert.deepEqual(writes, [{ row: 3, column: 1, value: 'WEEK 3 (9/14)' }]);
+  assert.deepEqual(writes, [
+    { row: 3, column: 1, value: 'WEEK 3 (9/14)' },
+    { row: 3, column: 1, property: 'fontWeight', value: 'bold' }
+  ]);
 });
 
 test('appends the new week row directly below the last populated row, ignoring trailing blanks', () => {
   const writes = [];
   const sheet = {
-    getRange: (row, column) => ({
-      getValue: () => '',
-      setValue: value => { writes.push({ row, column, value }); }
-    })
+    getRange(row, column) {
+      return {
+        getValue: () => '',
+        setValue(value) { writes.push({ row, column, value }); return this; },
+        setFontWeight(value) { writes.push({ row, column, property: 'fontWeight', value }); return this; }
+      };
+    }
   };
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');
@@ -155,5 +164,8 @@ test('appends the new week row directly below the last populated row, ignoring t
     ['', '']
   ];
   assert.equal(context.appendTarget(sheet, rows, new Date(2026, 8, 14)), 2);
-  assert.deepEqual(writes, [{ row: 3, column: 1, value: 'WEEK 3 (9/14)' }]);
+  assert.deepEqual(writes, [
+    { row: 3, column: 1, value: 'WEEK 3 (9/14)' },
+    { row: 3, column: 1, property: 'fontWeight', value: 'bold' }
+  ]);
 });

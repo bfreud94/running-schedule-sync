@@ -38,7 +38,9 @@ function appendWeekRow(actualSheet, sheetData, targetMonday) {
   // Trailing blank rows in the data range shouldn't push the new week further down.
   const rowIndex = getLastPopulatedRowIndex(sheetData) + 1;
   const weekLabel = formatWeekLabel(getNextWeekNumber(sheetData, targetMonday), targetMonday);
-  actualSheet.getRange(rowIndex + 1, 1).setValue(weekLabel);
+  actualSheet.getRange(rowIndex + 1, 1)
+    .setValue(weekLabel)
+    .setFontWeight('bold');
 
   // Carry the previous row's total formula forward; the local mock has no formula support.
   const previousTotalFormula = rowIndex > 0 ? actualSheet.getRange(rowIndex, 9).getFormula?.() : '';
