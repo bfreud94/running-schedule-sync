@@ -12,6 +12,7 @@ function syncStravaToActualRuns() {
     return;
   }
 
+  ensureRunsHeader(actualSheet);
   const actualData = actualSheet.getDataRange().getValues();
   const targetMonday = getMostRecentMonday();
   const existingRowIndex = findWeekRowIndex(actualData, targetMonday);
@@ -41,6 +42,7 @@ function syncStravaToActualRuns() {
 
   SpreadsheetApp.flush();
   const actualTotalMiles = updateTotalCell(actualSheet, targetRowIndex, plannedRow);
+  boldActualRunLabels(actualSheet);
 
   Logger.log(`Successfully updated row ${targetRowIndex + 1}. Column I evaluated total: ${actualTotalMiles}`);
 }

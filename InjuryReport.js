@@ -150,6 +150,7 @@ function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
         .setWrap(true)
         .setVerticalAlignment('middle');
 
+      if (columnIndex === 0 && rowIndex > 0) cell.setNumberFormat('mmmm d');
       if (columnIndex === 0) cell.setHorizontalAlignment('left');
       if (rowIndex === 0 || columnIndex === 0) cell.setFontWeight('bold');
     }
@@ -189,9 +190,27 @@ function ensureInjuryReportWeek(sheet, sheetData, weekStart) {
   });
 }
 
+function removeInjuryReportsBefore(sheet, sheetData, cutoffDate) {
+  const cutoffKey = getDateKey(cutoffDate);
+  sheetData
+    .map((row, rowIndex) => ({ rowIndex, date: parseSheetDate(row?.[0]) }))
+    .filter(({ rowIndex, date }) => rowIndex > 0 && date && getDateKey(date) < cutoffKey)
+    .map(({ rowIndex }) => rowIndex)
+    .reverse()
+    .forEach(rowIndex => sheet.deleteRows(rowIndex + 1, 1));
+
+  return sheet.getDataRange().getValues();
+}
+
 function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new Date()) {
-  const sheetData = sheet.getDataRange().getValues();
+  let sheetData = sheet.getDataRange().getValues();
+  sheetData = removeInjuryReportsBefore(
+    sheet,
+    sheetData,
+    new Date(currentDate.getFullYear(), 7, 31)
+  );
   ensureInjuryReportWeek(sheet, sheetData, weekStart);
+  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
 
   const headers = [...sheetData[0]];
   const activitiesByDate = activities.filter(isRunningActivity).reduce((groups, activity) => {

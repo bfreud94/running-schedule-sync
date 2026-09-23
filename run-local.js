@@ -3,9 +3,12 @@ const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { createGoogleSheetsMock } = require('./local/GoogleSheetsMock');
+const { loadActivityMocks } = require('./local/activityMocks');
 
 const functionName = process.argv[2];
 const shouldPrintResult = process.argv.includes('--json');
+const localArguments = process.argv.slice(3);
+const useActivityMocks = localArguments.includes('mocks') || localArguments.includes('--mocks');
 const fixtureArgumentIndex = process.argv.indexOf('--sheet-fixture');
 const fixturePath = fixtureArgumentIndex === -1 ? null : path.resolve(process.argv[fixtureArgumentIndex + 1]);
 const outputPath = path.resolve('output', 'spreadsheet.json');
@@ -21,6 +24,9 @@ if (!/^[A-Za-z_$][\w$]*$/.test(functionName)) {
 process.chdir(__dirname);
 
 const sheetsMock = fixturePath ? createGoogleSheetsMock(fixturePath, outputPath) : null;
+globalThis.__localSheetsMock = sheetsMock;
+globalThis.__localOutputPath = outputPath;
+globalThis.loadActivityMocks = loadActivityMocks;
 if (sheetsMock) {
   globalThis.SpreadsheetApp = sheetsMock.SpreadsheetApp;
 }
@@ -80,6 +86,10 @@ const scriptSource = scriptFiles
 const exposeFunction = `\nglobalThis.__localFunction = typeof ${functionName} === 'function' ? ${functionName} : undefined;`;
 
 vm.runInThisContext(scriptSource + exposeFunction, { filename: 'apps-script-source.js' });
+
+if (useActivityMocks || process.argv.includes('--activity-mocks')) {
+  globalThis.fetchStravaActivitiesSince = startDate => loadActivityMocks(startDate);
+}
 
 if (typeof globalThis.__localFunction !== 'function') {
   throw new Error(`Function "${functionName}" was not found in the Apps Script source files.`);

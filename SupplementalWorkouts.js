@@ -97,6 +97,20 @@ function findDayBlock(sheetData, dateKey) {
   return getAllDayBlocks(sheetData).find(block => getBlockDateKey(sheetData, block) === dateKey) || null;
 }
 
+function removeSupplementalWorkoutsBefore(sheet, sheetData, cutoffDate) {
+  const cutoffKey = getDateKey(cutoffDate);
+  const blocksToRemove = getAllDayBlocks(sheetData)
+    .filter(block => {
+      const blockDateKey = getBlockDateKey(sheetData, block);
+      return blockDateKey && blockDateKey < cutoffKey;
+    })
+    .sort((left, right) => right.startRowIndex - left.startRowIndex);
+
+  blocksToRemove.forEach(block => {
+    sheet.deleteRows(block.startRowIndex + 1, block.rowCount + 1);
+  });
+}
+
 function findChronologicalInsertionRowIndex(sheetData, dateKey) {
   const nextBlock = getAllDayBlocks(sheetData).find(block => {
     const blockDateKey = getBlockDateKey(sheetData, block);
@@ -149,7 +163,7 @@ function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group
       exercise.weight,
       exercise.notes
     ]]);
-    if (exerciseIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d, yyyy');
+    if (exerciseIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
   });
 
   for (let columnIndex = 1; columnIndex <= 2; columnIndex++) {
@@ -218,7 +232,10 @@ function ensureFinalSeparatorRow(sheet) {
   const separatorRow = lastRow + 1;
   const alreadyPainted = sheet.getRange(separatorRow, 1).getBackground()
     === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
-  if (!alreadyPainted && sheet.insertRows) sheet.insertRows(separatorRow, 1);
+  const separatorIsInDataRange = sheet.getDataRange().getValues().length >= separatorRow;
+  if ((!alreadyPainted || !separatorIsInDataRange) && sheet.insertRows) {
+    sheet.insertRows(separatorRow, 1);
+  }
 
   writeSeparatorRow(sheet, separatorRow - 1);
 }
@@ -236,11 +253,33 @@ function forceKnownSeparatorRow(sheet, rowNumber) {
   sheet.setRowHeight(rowNumber, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
+function clearBlackFromWorkoutRows(sheet, sheetData) {
+  sheetData.forEach((row, rowIndex) => {
+    if (rowIndex === 0 || isBlankRow(row)) return;
+    sheet.getRange(rowIndex + 1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length)
+      .setBackground(null);
+  });
+}
+
+function matchSupplementalFontToRowThree(sheet, sheetData) {
+  if (sheetData.length < 3) return;
+
+  const referenceCell = sheet.getRange(3, 1);
+  const fontFamily = referenceCell.getFontFamily?.();
+  const fontSize = referenceCell.getFontSize?.();
+  const range = sheet.getRange(1, 1, sheetData.length, SUPPLEMENTAL_WORKOUTS_HEADERS.length);
+  if (fontFamily !== undefined) range.setFontFamily(fontFamily);
+  if (fontSize !== undefined) range.setFontSize(fontSize);
+}
+
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME)
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
   sheetData = ensureHeaderSeparator(sheet, sheetData);
+  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
+  removeSupplementalWorkoutsBefore(sheet, sheet.getDataRange().getValues(), new Date(new Date().getFullYear(), 8, 15));
+  sheetData = sheet.getDataRange().getValues();
 
   activities.forEach(activity => {
     const exercises = parseSupplementalWorkoutDetails(activity.description).exercises;
@@ -282,16 +321,18 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
-  ensureDaySeparatorRows(sheet, sheetData);
-  ensureFinalSeparatorRow(sheet);
-  sheetData = sheet.getDataRange().getValues();
-  fillMissingSeparatorColumns(sheet, sheetData);
-  forceKnownSeparatorRow(sheet, 12);
+  clearBlackFromWorkoutRows(sheet, sheetData);
+  matchSupplementalFontToRowThree(sheet, sheetData);
 
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)
     .setVerticalAlignment('middle')
-    .setHorizontalAlignment('left');
+    .setHorizontalAlignment('left')
+    .setFontFamily(null)
+    .setFontSize(null);
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+  }
   if (sheetData.length > 1) {
     sheet.getRange(2, 1, sheetData.length - 1, 2)
       .setVerticalAlignment('top')
@@ -305,4 +346,5 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sheet.setColumnWidth(5, 140);
   sheet.setColumnWidth(6, 150);
   sheet.setColumnWidth(7, 220);
+  ensureFinalSeparatorRow(sheet);
 }

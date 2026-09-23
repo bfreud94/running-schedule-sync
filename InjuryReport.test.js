@@ -194,6 +194,36 @@ test('creates a Status column when no injury body-part columns exist', () => {
   assert.deepEqual([...headers], ['Date', 'Status']);
 });
 
+test('removes dated injury rows before August 31 and keeps the cutoff date', () => {
+  const values = [
+    ['Date', 'Status'],
+    [new Date(2026, 7, 29), 'No injuries reported'],
+    [new Date(2026, 7, 30), 'No injuries reported'],
+    [new Date(2026, 7, 31), 'No injuries reported'],
+    [new Date(2026, 8, 1), 'No injuries reported']
+  ];
+  const deletedRows = [];
+  const sheet = {
+    deleteRows(row, count) {
+      deletedRows.push({ row, count });
+      values.splice(row - 1, count);
+    },
+    getDataRange: () => ({ getValues: () => values })
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+  vm.runInContext(`${source}\nglobalThis.removeBeforeTarget = removeInjuryReportsBefore;`, context);
+
+  const remaining = context.removeBeforeTarget(sheet, values, new Date(2026, 7, 31));
+
+  assert.deepEqual(deletedRows, [{ row: 3, count: 1 }, { row: 2, count: 1 }]);
+  assert.deepEqual(remaining.map(row => row[0]), [
+    'Date',
+    new Date(2026, 7, 31),
+    new Date(2026, 8, 1)
+  ]);
+});
+
 test('fills blank body-part cells when another area has an injury', () => {
   const values = { '2,2': '', '2,3': '' };
   const sheet = {

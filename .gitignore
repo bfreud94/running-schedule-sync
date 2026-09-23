@@ -2,3 +2,6 @@
 node_modules/
 .env
 output/
+.local/
+local/google-oauth-client.json
+local/mocks/*.json

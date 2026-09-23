@@ -66,3 +66,33 @@ test('adds descriptions to summary activities since Monday', () => {
   assert.equal(requestedUrls.filter(url => url.includes('/athlete/activities')).length, 2);
   assert.equal(requestedUrls.filter(url => /\/activities\/\d+$/.test(url)).length, 101);
 });
+
+test('fails fast on Strava rate limits instead of returning no activities', () => {
+  const context = vm.createContext({
+    console,
+    Logger: { log: () => {} },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: key => ({
+          STRAVA_CLIENT_ID: 'client-id',
+          STRAVA_CLIENT_SECRET: 'client-secret',
+          STRAVA_REFRESH_TOKEN: 'refresh-token'
+        })[key],
+        setProperty: () => {}
+      })
+    },
+    UrlFetchApp: {
+      fetch(url) {
+        if (url.includes('/oauth/token')) return createResponse(200, { access_token: 'access-token' });
+        return createResponse(429, { message: 'Rate Limit Exceeded' });
+      }
+    }
+  });
+  const source = readFileSync('StravaAPI.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.fetchTarget = fetchStravaActivitiesSince;`, context);
+  assert.throws(
+    () => context.fetchTarget(new Date(2026, 7, 31)),
+    /Retry after the rate limit resets/
+  );
+});

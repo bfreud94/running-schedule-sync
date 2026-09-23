@@ -4,7 +4,12 @@
   "scripts": {
     "test": "node --test",
     "setup-hooks": "git config core.hooksPath .githooks",
-    "local": "node ./run-local.js syncStravaToActualRuns --sheet-fixture ./fixtures/spreadsheet.json",
+    "local": "node ./local/local-command.js",
+    "auth:google": "node ./local/setup-google-auth.js",
+    "update:planned": "node ./local/sync-planned-schedule.js",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./push.ps1"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0"
   }
 }

@@ -68,11 +68,58 @@ function ensureWorkoutSplitsHeader(sheet, sheetData) {
   return sheetData;
 }
 
-function writeSeparatorRow(sheet, rowIndex) {
+function writeWorkoutSplitsSeparatorRow(sheet, rowIndex) {
   for (let column = 1; column <= WORKOUT_SPLITS_HEADERS.length; column++) {
     sheet.getRange(rowIndex + 1, column).setBackground(WORKOUT_SPLITS_SEPARATOR_BACKGROUND);
   }
   sheet.setRowHeight(rowIndex + 1, WORKOUT_SPLITS_SEPARATOR_HEIGHT);
+}
+
+function isWorkoutSplitsBlankRow(row) {
+  return !row || row.every(value => String(value || '').trim() === '');
+}
+
+function ensureWorkoutSplitSeparatorRows(sheet, sheetData) {
+  const headerSeparatorIsMissing = !isWorkoutSplitsBlankRow(sheetData[1]);
+  if (headerSeparatorIsMissing || sheetData.length < 2) sheet.insertRows(2, 1);
+  writeWorkoutSplitsSeparatorRow(sheet, 1);
+  sheetData = sheet.getDataRange().getValues();
+
+  const dayStartRowIndexes = sheetData
+    .map((row, rowIndex) => ({ rowIndex, date: parseSheetDate(row?.[0]) }))
+    .filter(({ date }) => date)
+    .map(({ rowIndex }) => rowIndex);
+
+  dayStartRowIndexes.slice(1).reverse().forEach(rowIndex => {
+    if (isWorkoutSplitsBlankRow(sheetData[rowIndex - 1])) {
+      writeWorkoutSplitsSeparatorRow(sheet, rowIndex - 1);
+      return;
+    }
+
+    sheet.insertRows(rowIndex + 1, 1);
+    writeWorkoutSplitsSeparatorRow(sheet, rowIndex);
+  });
+
+  const lastRow = sheet.getLastRow();
+  const finalSeparatorRow = lastRow + 1;
+  if (sheet.getDataRange().getValues().length < finalSeparatorRow) {
+    sheet.insertRows(finalSeparatorRow, 1);
+  }
+  writeWorkoutSplitsSeparatorRow(sheet, finalSeparatorRow - 1);
+
+  return sheet.getDataRange().getValues();
+}
+
+function clearSeparatorFormattingFromWorkoutRow(sheet, rowIndex) {
+  const sheetRow = rowIndex + 1;
+  sheet.getRange(sheetRow, 1, 1, WORKOUT_SPLITS_HEADERS.length).setBackground(null);
+
+  let column = WORKOUT_SPLITS_HEADERS.length + 1;
+  while (sheet.getRange(sheetRow, column).getBackground() === WORKOUT_SPLITS_SEPARATOR_BACKGROUND) {
+    sheet.getRange(sheetRow, column).setBackground(null);
+    column++;
+  }
+  sheet.autoResizeRows?.(sheetRow, 1);
 }
 
 function findAppendRowIndex(sheet, sheetData) {
@@ -97,13 +144,14 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
 
   splits.forEach((split, splitIndex) => {
     const rowIndex = startRowIndex + splitIndex;
+    clearSeparatorFormattingFromWorkoutRow(sheet, rowIndex);
     sheet.getRange(rowIndex + 1, 1, 1, WORKOUT_SPLITS_HEADERS.length).setValues([[
       splitIndex === 0 ? activityDate : '',
       splitIndex === 0 ? workout : '',
       split.value,
       split.pace
     ]]);
-    if (splitIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d, yyyy');
+    if (splitIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
   });
 
   for (let columnIndex = 1; columnIndex <= 2; columnIndex++) {
@@ -112,13 +160,14 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
       .setVerticalAlignment('top');
   }
 
-  writeSeparatorRow(sheet, startRowIndex + splits.length);
+  writeWorkoutSplitsSeparatorRow(sheet, startRowIndex + splits.length);
 }
 
 function updateWorkoutSplitsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(WORKOUT_SPLITS_SHEET_NAME)
     || spreadsheet.insertSheet(WORKOUT_SPLITS_SHEET_NAME);
   let sheetData = ensureWorkoutSplitsHeader(sheet, sheet.getDataRange().getValues());
+  normalizeSheetDateColumn(sheet, sheetData);
 
   activities.filter(isRunningActivity).forEach(activity => {
     const workout = parseWorkout(activity.description);
@@ -130,15 +179,22 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
     sheetData = sheet.getDataRange().getValues();
   });
 
+  sheetData = ensureWorkoutSplitSeparatorRows(sheet, sheetData);
+
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), WORKOUT_SPLITS_HEADERS.length)
     .setWrap(true)
-    .setVerticalAlignment('middle');
+    .setVerticalAlignment('middle')
+    .setHorizontalAlignment('left');
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+  }
   if (sheetData.length > 1) {
     sheet.getRange(2, 1, sheetData.length - 1, 2)
       .setVerticalAlignment('top')
       .setHorizontalAlignment('left');
+    sheet.getRange(2, 1, sheetData.length - 1, WORKOUT_SPLITS_HEADERS.length)
+      .setFontWeight('normal');
   }
-  sheet.getRange(1, 3, Math.max(sheetData.length, 1), 2).setHorizontalAlignment('left');
   sheet.getRange(1, 1, 1, WORKOUT_SPLITS_HEADERS.length).setFontWeight('bold');
   sheet.setColumnWidth(1, 140);
   sheet.setColumnWidth(2, 140);

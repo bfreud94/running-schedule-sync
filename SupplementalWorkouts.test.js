@@ -46,6 +46,33 @@ test('fills E:G for rows containing a black separator cell in A:D', () => {
   ]);
 });
 
+test('copies row 3 font family and size across the Supplemental Workouts sheet', () => {
+  const calls = [];
+  const sheet = {
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        getFontFamily: () => row === 3 && column === 1 ? 'Reference Font' : undefined,
+        getFontSize: () => row === 3 && column === 1 ? 11 : undefined,
+        setFontFamily: value => { calls.push({ property: 'fontFamily', value, row, column, numRows, numColumns }); return this; },
+        setFontSize: value => { calls.push({ property: 'fontSize', value, row, column, numRows, numColumns }); return this; }
+      };
+    }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.fontTarget = matchSupplementalFontToRowThree;', context);
+
+  context.fontTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    ['2026-09-22', 'Core', 'Planks', '2', '10', 'N/A', '']
+  ]);
+
+  assert.deepEqual(calls, [
+    { property: 'fontFamily', value: 'Reference Font', row: 1, column: 1, numRows: 3, numColumns: 7 },
+    { property: 'fontSize', value: 11, row: 1, column: 1, numRows: 3, numColumns: 7 }
+  ]);
+});
+
 test('adds a separator after the final day block when it is missing', () => {
   const writes = [];
   const sheet = {
@@ -68,6 +95,30 @@ test('adds a separator after the final day block when it is missing', () => {
   ]);
 
   assert.deepEqual(writes, [
+    { row: 5, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 5, height: 10 }
+  ]);
+});
+
+test('inserts the final separator row when its formatting is outside the data range', () => {
+  const writes = [];
+  const sheet = {
+    getLastRow: () => 4,
+    getDataRange: () => ({ getValues: () => [[], [], [], []] }),
+    getRange: (row, column, numRows = 1, numColumns = 1) => ({
+      getBackground: () => '#000000',
+      setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); }
+    }),
+    insertRows: (row, count) => { writes.push({ row, count }); },
+    setRowHeight: (row, height) => { writes.push({ row, height }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.finalSeparatorTarget = ensureFinalSeparatorRow;', context);
+
+  context.finalSeparatorTarget(sheet);
+
+  assert.deepEqual(writes, [
+    { row: 5, count: 1 },
     { row: 5, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
     { row: 5, height: 10 }
   ]);

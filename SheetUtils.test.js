@@ -96,6 +96,27 @@ test('calculates total mileage from the current row daily cells', () => {
   assert.equal(totalValue, '25.25 miles');
 });
 
+test('styles existing daily values without rewriting them', () => {
+  const styles = [];
+  const sheet = {
+    getRange: (row, column) => ({
+      getValue: () => column === 2 ? '4 miles' : '',
+      setBackground: value => { styles.push({ row, column, property: 'background', value }); },
+      setFontColor: value => { styles.push({ row, column, property: 'fontColor', value }); }
+    })
+  };
+  const context = vm.createContext({ console });
+  const source = `${readFileSync('RunningMetrics.js', 'utf8')}\n${readFileSync('SheetUtils.js', 'utf8')}`;
+
+  vm.runInContext(`${source}\nglobalThis.styleTarget = applyDailyCellStyles;`, context);
+  context.styleTarget(sheet, 0, ['Week', '4 miles'], 0);
+
+  assert.deepEqual(styles, [
+    { row: 1, column: 2, property: 'background', value: '#34a853' },
+    { row: 1, column: 2, property: 'fontColor', value: '#ffffff' }
+  ]);
+});
+
 test('finds the planned row by week instead of row position', () => {
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');

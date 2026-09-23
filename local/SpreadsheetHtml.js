@@ -54,6 +54,8 @@ function renderSheet(name, sheet, changes) {
         style.background ? `background:${style.background}` : '',
         style.fontColor ? `color:${style.fontColor}` : '',
         style.fontWeight ? `font-weight:${style.fontWeight}` : '',
+        style.fontFamily ? `font-family:${style.fontFamily}` : '',
+        style.fontSize ? `font-size:${style.fontSize}px` : '',
         style.wrap ? 'white-space:pre-wrap' : '',
         style.verticalAlignment ? `vertical-align:${style.verticalAlignment}` : '',
         style.horizontalAlignment ? `text-align:${style.horizontalAlignment}` : '',

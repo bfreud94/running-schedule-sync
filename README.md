@@ -67,13 +67,36 @@ always shows a color per cell rather than coloring the whole row by the worst in
 
 ```powershell
 npm test           # run the unit tests (node --test)
-npm run local       # run syncStravaToActualRuns() locally against fixtures/spreadsheet.json
+npm run local       # live Strava, since the most recent Monday
+npm run local -- 2026-09-01 # live Strava, since the supplied date
+npm run local -- 2026-09-01 mocks # local mocks, since the supplied date
+npm run local -- pull 2026-09-01 # pull Strava, save mocks, then update spreadsheet.json
+npm run auth:google # authorize local read-only Google Sheets access once
+npm run update:planned # pull production Planned Schedule into fixtures/spreadsheet.json
 npm run push         # git push, then clasp push to deploy to Apps Script
 ```
 
 `npm run local` executes the script in Node using `local/GoogleSheetsMock.js` in place of
 `SpreadsheetApp`, and `curl` in place of `UrlFetchApp`, writing the resulting sheet state to
 `output/spreadsheet.json` (and `output/spreadsheet.html` for a visual preview). Strava credentials
-for local runs are read from a `.env` file (`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`,
+for live runs are read from a `.env` file (`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`,
 `STRAVA_REFRESH_TOKEN`); when deployed, the same keys are read from Apps Script's
-`PropertiesService` script properties instead.
+`PropertiesService` script properties instead. Add the positional word `mocks` to use files from
+`local/mocks/` instead of contacting Strava.
+
+`npm run local -- pull 2026-09-01` runs the pull and local spreadsheet sync sequentially. It saves
+each running activity under `local/mocks/` and then writes the complete local workbook to
+`output/spreadsheet.json`. This is the only combined pull-and-sync command.
+
+## Local Google Sheets authentication
+
+For local access to the private production spreadsheet:
+
+1. In Google Cloud Console, create an OAuth client for a **Desktop app** and download its JSON.
+2. Save that file as `local/google-oauth-client.json`.
+3. Run `npm run auth:google` and authorize the requested read-only Sheets scope in the browser.
+4. Run `npm run update:planned` to update only `fixtures/spreadsheet.json`'s **Planned Schedule** tab.
+5. Run `npm run local:last-month` to sync the previous month using that planned data.
+
+The client JSON and refresh token are ignored by git. Production does not use this OAuth flow; it
+continues reading the active spreadsheet through Apps Script's `SpreadsheetApp` authorization.

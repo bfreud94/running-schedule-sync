@@ -4,6 +4,34 @@ const COLORS = {
   yellow: 'yellow',
   white: '#ffffff',
 };
+const RUNS_HEADERS = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Total Mileage'];
+
+function ensureRunsHeader(sheet) {
+  const firstRow = sheet.getDataRange().getValues()[0] || [];
+  const hasHeader = RUNS_HEADERS.every((header, index) => String(firstRow[index] || '') === header);
+  if (hasHeader) {
+    sheet.getRange(1, 1, 1, RUNS_HEADERS.length)
+      .setBackground(null)
+      .setFontColor('#202124')
+      .setFontWeight('bold');
+    return;
+  }
+
+  if (sheet.insertRows) sheet.insertRows(1, 1);
+  sheet.getRange(1, 1, 1, RUNS_HEADERS.length)
+    .setValues([RUNS_HEADERS])
+    .setBackground(null)
+    .setFontColor('#202124')
+    .setFontWeight('bold');
+}
+function boldActualRunLabels(sheet) {
+  const rows = sheet.getDataRange().getValues();
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+    if (String(rows[rowIndex][0] || '').trim().toUpperCase().startsWith('WEEK ')) {
+      sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
+    }
+  }
+}
 
 function findWeekRowIndex(sheetData, targetMonday) {
   return sheetData.findIndex(row => areSameDate(getWeekDate(row[0]), targetMonday));
@@ -99,6 +127,16 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
     if (plannedRow) {
       applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], stravaMiles));
     }
+  }
+}
+
+function applyDailyCellStyles(actualSheet, rowIndex, plannedRow, todayOffset) {
+  if (!plannedRow) return;
+
+  for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
+    const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
+    const actualMiles = parseMilesFromCell(targetCell.getValue());
+    applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], actualMiles));
   }
 }
 

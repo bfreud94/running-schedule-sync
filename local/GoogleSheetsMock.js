@@ -24,6 +24,12 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         sheet.rowHeights[row] = height;
         changes.push({ sheet: name, row, property: 'rowHeight', value: height });
       },
+      autoResizeRows(startRow, numRows) {
+        for (let row = startRow; row < startRow + numRows; row++) {
+          delete sheet.rowHeights[row];
+          changes.push({ sheet: name, row, property: 'rowHeight', value: null });
+        }
+      },
       getLastRow() {
         for (let rowIndex = sheet.values.length - 1; rowIndex >= 0; rowIndex--) {
           if (sheet.values[rowIndex]?.some(value => String(value || '').trim() !== '')) return rowIndex + 1;
@@ -91,6 +97,8 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         return {
           getValue: () => sheet.values[rowIndex]?.[columnIndex],
           getBackground: () => sheet.styles[`${row},${column}`]?.background || '#ffffff',
+          getFontFamily: () => sheet.styles[`${row},${column}`]?.fontFamily || 'Aptos',
+          getFontSize: () => sheet.styles[`${row},${column}`]?.fontSize || 13,
           setValue(value) {
             sheet.values[rowIndex] ||= [];
             const previousValue = sheet.values[rowIndex][columnIndex];
@@ -137,9 +145,39 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             return this;
           },
           setFontWeight(value) {
-            sheet.styles[`${row},${column}`] ||= {};
-            sheet.styles[`${row},${column}`].fontWeight = value;
-            changes.push({ sheet: name, row, column, property: 'fontWeight', value });
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                sheet.styles[`${targetRow},${targetColumn}`].fontWeight = value;
+                changes.push({ sheet: name, row: targetRow, column: targetColumn, property: 'fontWeight', value });
+              }
+            }
+            return this;
+          },
+          setFontFamily(value) {
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                if (value === null) delete sheet.styles[`${targetRow},${targetColumn}`].fontFamily;
+                else sheet.styles[`${targetRow},${targetColumn}`].fontFamily = value;
+              }
+            }
+            return this;
+          },
+          setFontSize(value) {
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                if (value === null) delete sheet.styles[`${targetRow},${targetColumn}`].fontSize;
+                else sheet.styles[`${targetRow},${targetColumn}`].fontSize = value;
+              }
+            }
             return this;
           },
           setNumberFormat(value) {
@@ -155,9 +193,15 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             return this;
           },
           setVerticalAlignment(value) {
-            sheet.styles[`${row},${column}`] ||= {};
-            sheet.styles[`${row},${column}`].verticalAlignment = value;
-            changes.push({ sheet: name, row, column, property: 'verticalAlignment', value });
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                sheet.styles[`${targetRow},${targetColumn}`].verticalAlignment = value;
+                changes.push({ sheet: name, row: targetRow, column: targetColumn, property: 'verticalAlignment', value });
+              }
+            }
             return this;
           },
           merge() {
@@ -188,9 +232,15 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
             return this;
           },
           setHorizontalAlignment(value) {
-            sheet.styles[`${row},${column}`] ||= {};
-            sheet.styles[`${row},${column}`].horizontalAlignment = value;
-            changes.push({ sheet: name, row, column, property: 'horizontalAlignment', value });
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = row + rowOffset;
+                const targetColumn = column + columnOffset;
+                sheet.styles[`${targetRow},${targetColumn}`] ||= {};
+                sheet.styles[`${targetRow},${targetColumn}`].horizontalAlignment = value;
+                changes.push({ sheet: name, row: targetRow, column: targetColumn, property: 'horizontalAlignment', value });
+              }
+            }
             return this;
           }
         };
@@ -202,7 +252,8 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
     const actualRuns = workbook.sheets['Actual Runs'];
     if (!actualRuns) return;
 
-    actualRuns.values.forEach(row => {
+    actualRuns.values.forEach((row, rowIndex) => {
+      if (rowIndex === 0 && String(row[1] || '').trim().toLowerCase() === 'monday') return;
       const total = row.slice(1, 8).reduce((sum, value) => sum + (parseFloat(value) || 0), 0);
       row[8] = `${Math.floor(total * 100) / 100} miles`;
     });

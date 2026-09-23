@@ -60,3 +60,23 @@ function parseActivityDate(activity) {
   const [year, month, day] = activity.start_date_local.split('T')[0].split('-').map(Number);
   return new Date(year, month - 1, day, 0, 0, 0, 0);
 }
+
+function normalizeSheetDateColumn(sheet, sheetData, startRowIndex = 1) {
+  for (let rowIndex = startRowIndex; rowIndex < sheetData.length; rowIndex++) {
+    const parsedDate = parseSheetDateValue(sheetData[rowIndex]?.[0]);
+    if (!parsedDate) continue;
+
+    sheet.getRange(rowIndex + 1, 1)
+      .setValue(parsedDate)
+      .setNumberFormat('mmmm d');
+  }
+}
+
+function parseSheetDateValue(value) {
+  if (value instanceof Date) return getStartOfDay(value);
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(text)) return null;
+
+  const parsedDate = new Date(text);
+  return Number.isNaN(parsedDate.getTime()) ? null : getStartOfDay(parsedDate);
+}

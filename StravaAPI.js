@@ -57,7 +57,9 @@ function fetchStravaResource(endpoint, accessToken) {
   const statusCode = response.getResponseCode();
 
   if (statusCode !== 200) {
-    Logger.log(`Strava API request failed (${statusCode}) for ${endpoint}: ${response.getContentText()}`);
+    const message = `Strava API request failed (${statusCode}) for ${endpoint}: ${response.getContentText()}`;
+    Logger.log(message);
+    if (statusCode === 429) throw new Error(`${message} Retry after the rate limit resets.`);
     return null;
   }
 
@@ -67,7 +69,7 @@ function fetchStravaResource(endpoint, accessToken) {
 function fetchStravaActivityPage(startDate, page, accessToken) {
   const afterTimestamp = Math.floor(startDate.getTime() / 1000) - 1;
   const endpoint = `https://www.strava.com/api/v3/athlete/activities?after=${afterTimestamp}&page=${page}&per_page=100`;
-  return fetchStravaResource(endpoint, accessToken) || [];
+  return fetchStravaResource(endpoint, accessToken);
 }
 
 function fetchStravaActivitySummariesSince(startDate, accessToken) {
