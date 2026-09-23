@@ -101,6 +101,13 @@ function getLastHeaderColumnIndex(headers) {
   return 0;
 }
 
+function ensureStatusColumn(sheet, headers) {
+  if (getLastHeaderColumnIndex(headers) >= 1) return;
+
+  sheet.getRange(1, 2).setValue('Status');
+  headers[1] = 'Status';
+}
+
 function highlightInjuryRow(sheet, rowIndex, lastHeaderColumnIndex, color) {
   for (let columnIndex = 0; columnIndex <= lastHeaderColumnIndex; columnIndex++) {
     sheet.getRange(rowIndex + 1, columnIndex + 1).setBackground(color);
@@ -204,6 +211,7 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
   Object.values(reportsByDate).flat().forEach(report => {
     findOrCreateBodyPartColumn(sheet, headers, report.bodyPart, sheetData.length);
   });
+  ensureStatusColumn(sheet, headers);
 
   getWeekDates(weekStart).forEach(activityDate => {
     const dateKey = getDateKey(activityDate);

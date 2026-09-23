@@ -174,6 +174,26 @@ test('status text is written in every body-part cell', () => {
   });
 });
 
+test('creates a Status column when no injury body-part columns exist', () => {
+  let headerValue;
+  const sheet = {
+    getRange(row, column) {
+      return {
+        setValue: value => { if (row === 1 && column === 2) headerValue = value; }
+      };
+    }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.statusColumnTarget = ensureStatusColumn;`, context);
+  const headers = ['Date'];
+  context.statusColumnTarget(sheet, headers);
+
+  assert.equal(headerValue, 'Status');
+  assert.deepEqual([...headers], ['Date', 'Status']);
+});
+
 test('fills blank body-part cells when another area has an injury', () => {
   const values = { '2,2': '', '2,3': '' };
   const sheet = {
