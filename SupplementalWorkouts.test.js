@@ -46,6 +46,56 @@ test('fills E:G for rows containing a black separator cell in A:D', () => {
   ]);
 });
 
+test('adds a separator after the final day block when it is missing', () => {
+  const writes = [];
+  const sheet = {
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        getBackground: () => '#ffffff',
+        setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); return this; }
+      };
+    },
+    setRowHeight: (row, height) => { writes.push({ row, height }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.separatorTarget = ensureDaySeparatorRows;', context);
+
+  context.separatorTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    ['2026-09-22', 'Upper Body Lift', 'Bench Press', '3', '10\n8\n7', '80 lbs\n85 lbs\n90 lbs', ''],
+    ['', '', 'Accessory Exercise', '2', '10', 'N/A', '']
+  ]);
+
+  assert.deepEqual(writes, [
+    { row: 5, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 5, height: 10 }
+  ]);
+});
+
+test('forces the known production separator row across all seven columns', () => {
+  const fills = [];
+  let cleared = false;
+  const sheet = {
+    getRange: (row, column, numRows = 1, numColumns = 1) => ({
+      breakApart: () => {},
+      clearContent: () => { cleared = true; },
+      setBackground: value => { fills.push({ row, column, numRows, numColumns, value }); return this; }
+    }),
+    setRowHeight: (row, height) => { fills.push({ row, height }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.forceTarget = forceKnownSeparatorRow;', context);
+
+  context.forceTarget(sheet, 12);
+
+  assert.equal(cleared, true);
+  assert.deepEqual(fills, [
+    { row: 12, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 12, height: 10 }
+  ]);
+});
+
 test('groups exercises by category, preserving first-seen order', () => {
   const context = loadContext();
   vm.runInContext('globalThis.groupTarget = groupExercisesByCategory;', context);
@@ -151,13 +201,13 @@ test('overwrites a day already recorded when its exercises change', () => {
     };
 
     const firstValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (1x1:00)');
-    assert.equal(firstValues.length, 2);
-    assert.equal(firstValues[1][3], '1');
+    const firstWorkoutRow = firstValues.find(row => row?.[2] === 'Planks');
+    assert.equal(firstWorkoutRow[3], '1');
 
     const secondValues = runUpdate('Supplemental Workouts:\nCore\n1. Planks (2x1:30)\n2. Side Planks (2x1:00, each side)');
-    assert.equal(secondValues.length, 3);
-    assert.equal(secondValues[1][3], '2');
-    assert.equal(secondValues[2][2], 'Side Planks');
+    const secondWorkoutRows = secondValues.filter(row => ['Planks', 'Side Planks'].includes(row?.[2]));
+    assert.equal(secondWorkoutRows[0][3], '2');
+    assert.equal(secondWorkoutRows[1][2], 'Side Planks');
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

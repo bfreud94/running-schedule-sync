@@ -33,7 +33,7 @@ function renderSheet(name, sheet, changes) {
       }
     }
   });
-  const columnCount = Math.max(9, ...sheet.values.map(row => row.length));
+  const columnCount = Math.max(9, ...sheet.values.map(row => (row || []).length));
   const columns = Array.from({ length: columnCount }, (_, index) => String.fromCharCode(65 + index));
   const rows = sheet.values.map((row, rowIndex) => {
     const rowHeight = sheet.rowHeights?.[rowIndex + 1];
@@ -62,7 +62,7 @@ function renderSheet(name, sheet, changes) {
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       const rowSpan = mergedCell && mergedCell.rowSpan > 1 ? ` rowspan="${mergedCell.rowSpan}"` : '';
       const columnSpan = mergedCell && mergedCell.columnSpan > 1 ? ` colspan="${mergedCell.columnSpan}"` : '';
-      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${escapeHtml(formatCellValue(row[columnIndex]))}</td>`;
+      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${escapeHtml(formatCellValue(row?.[columnIndex]))}</td>`;
     }).join('');
 
     const rowStyle = rowHeight ? ` style="height:${rowHeight}px"` : '';

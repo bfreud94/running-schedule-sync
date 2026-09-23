@@ -167,6 +167,18 @@ function writeSeparatorRow(sheet, rowIndex) {
   sheet.setRowHeight(rowIndex + 1, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
+function ensureHeaderSeparator(sheet, sheetData) {
+  const separatorRowIndex = 1;
+  const isSeparator = sheet.getRange(separatorRowIndex + 1, 1).getBackground()
+    === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+  if (!isSeparator) {
+    sheet.insertRows(separatorRowIndex + 1, 1);
+  }
+
+  writeSeparatorRow(sheet, separatorRowIndex);
+  return sheet.getDataRange().getValues();
+}
+
 function fillMissingSeparatorColumns(sheet, sheetData) {
   const repaintIfSeparator = rowIndex => {
     const sheetRow = rowIndex + 1;
@@ -187,10 +199,48 @@ function fillMissingSeparatorColumns(sheet, sheetData) {
   repaintIfSeparator(sheetData.length);
 }
 
+function ensureDaySeparatorRows(sheet, sheetData) {
+  getAllDayBlocks(sheetData).forEach(block => {
+    const separatorRowIndex = block.startRowIndex + block.rowCount;
+    const separatorAlreadyExists = sheet.getRange(separatorRowIndex + 1, 1).getBackground()
+      === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+    if (separatorRowIndex >= sheetData.length && !separatorAlreadyExists && sheet.insertRows) {
+      sheet.insertRows(separatorRowIndex + 1, 1);
+    }
+    writeSeparatorRow(sheet, separatorRowIndex);
+  });
+}
+
+function ensureFinalSeparatorRow(sheet) {
+  if (!sheet.getLastRow) return;
+
+  const lastRow = sheet.getLastRow();
+  const separatorRow = lastRow + 1;
+  const alreadyPainted = sheet.getRange(separatorRow, 1).getBackground()
+    === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+  if (!alreadyPainted && sheet.insertRows) sheet.insertRows(separatorRow, 1);
+
+  writeSeparatorRow(sheet, separatorRow - 1);
+}
+
+function forceKnownSeparatorRow(sheet, rowNumber) {
+  const separatorRange = sheet.getRange(rowNumber, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length);
+  const hasContent = Array.from({ length: SUPPLEMENTAL_WORKOUTS_HEADERS.length }, (_, columnIndex) =>
+    String(sheet.getRange(rowNumber, columnIndex + 1).getValue?.() || '').trim()
+  ).some(Boolean);
+  if (hasContent) return;
+
+  if (separatorRange.breakApart) separatorRange.breakApart();
+  if (separatorRange.clearContent) separatorRange.clearContent();
+  separatorRange.setBackground(SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND);
+  sheet.setRowHeight(rowNumber, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
+}
+
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME)
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
+  sheetData = ensureHeaderSeparator(sheet, sheetData);
 
   activities.forEach(activity => {
     const exercises = parseSupplementalWorkoutDetails(activity.description).exercises;
@@ -232,7 +282,11 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
+  ensureDaySeparatorRows(sheet, sheetData);
+  ensureFinalSeparatorRow(sheet);
+  sheetData = sheet.getDataRange().getValues();
   fillMissingSeparatorColumns(sheet, sheetData);
+  forceKnownSeparatorRow(sheet, 12);
 
   sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)

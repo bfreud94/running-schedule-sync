@@ -24,6 +24,12 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         sheet.rowHeights[row] = height;
         changes.push({ sheet: name, row, property: 'rowHeight', value: height });
       },
+      getLastRow() {
+        for (let rowIndex = sheet.values.length - 1; rowIndex >= 0; rowIndex--) {
+          if (sheet.values[rowIndex]?.some(value => String(value || '').trim() !== '')) return rowIndex + 1;
+        }
+        return 0;
+      },
       deleteRows(startRow, numRows) {
         sheet.values.splice(startRow - 1, numRows);
 
@@ -76,7 +82,7 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
         changes.push({ sheet: name, row: startRow, property: 'insertRows', value: numRows });
       },
       getDataRange: () => ({
-        getValues: () => sheet.values.map(row => [...row])
+        getValues: () => sheet.values.map(row => [...(row || [])])
       }),
       getRange(row, column, numRows = 1, numColumns = 1) {
         const rowIndex = row - 1;
@@ -168,6 +174,17 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
               existing.row < row || existing.row >= row + numRows ||
               existing.column < column || existing.column >= column + numColumns
             );
+            return this;
+          },
+          clearContent() {
+            for (let rowOffset = 0; rowOffset < numRows; rowOffset++) {
+              for (let columnOffset = 0; columnOffset < numColumns; columnOffset++) {
+                const targetRow = rowIndex + rowOffset;
+                const targetColumn = columnIndex + columnOffset;
+                sheet.values[targetRow] ||= [];
+                sheet.values[targetRow][targetColumn] = '';
+              }
+            }
             return this;
           },
           setHorizontalAlignment(value) {
