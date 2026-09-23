@@ -2,6 +2,10 @@ function getInjuryReportSheetName(date = new Date()) {
   return `${date.getFullYear()} Injury Report`;
 }
 
+function isLocalInjuryReportEnvironment() {
+  return typeof PropertiesService === 'undefined';
+}
+
 function getOrCreateInjuryReportSheet(spreadsheet, date = new Date()) {
   const sheetName = getInjuryReportSheetName(date);
   return spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
@@ -150,7 +154,9 @@ function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
         .setWrap(true)
         .setVerticalAlignment('middle');
 
-      if (columnIndex === 0 && rowIndex > 0) cell.setNumberFormat('mmmm d');
+      if (isLocalInjuryReportEnvironment() && columnIndex === 0 && rowIndex > 0) {
+        cell.setNumberFormat('mmmm d');
+      }
       if (columnIndex === 0) cell.setHorizontalAlignment('left');
       if (rowIndex === 0 || columnIndex === 0) cell.setFontWeight('bold');
     }
@@ -204,13 +210,17 @@ function removeInjuryReportsBefore(sheet, sheetData, cutoffDate) {
 
 function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new Date()) {
   let sheetData = sheet.getDataRange().getValues();
-  sheetData = removeInjuryReportsBefore(
-    sheet,
-    sheetData,
-    new Date(currentDate.getFullYear(), 7, 31)
-  );
+  if (isLocalInjuryReportEnvironment()) {
+    sheetData = removeInjuryReportsBefore(
+      sheet,
+      sheetData,
+      new Date(currentDate.getFullYear(), 7, 31)
+    );
+  }
   ensureInjuryReportWeek(sheet, sheetData, weekStart);
-  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
+  if (isLocalInjuryReportEnvironment()) {
+    normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
+  }
 
   const headers = [...sheetData[0]];
   const activitiesByDate = activities.filter(isRunningActivity).reduce((groups, activity) => {

@@ -90,7 +90,7 @@ test('fails fast on Strava rate limits instead of returning no activities', () =
   });
   const source = readFileSync('StravaAPI.js', 'utf8');
 
-  vm.runInContext(`${source}\nglobalThis.fetchTarget = fetchStravaActivitiesSince;`, context);
+  vm.runInContext(`${source}\nglobalThis.isLocalStravaEnvironment = () => true; globalThis.fetchTarget = fetchStravaActivitiesSince;`, context);
   assert.throws(
     () => context.fetchTarget(new Date(2026, 7, 31)),
     /Retry after the rate limit resets/

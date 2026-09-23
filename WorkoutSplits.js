@@ -3,6 +3,10 @@ const WORKOUT_SPLITS_HEADERS = ['Date', 'Workout', 'Splits', 'Splits (Pace)'];
 const WORKOUT_SPLITS_SEPARATOR_BACKGROUND = '#000000';
 const WORKOUT_SPLITS_SEPARATOR_HEIGHT = 10;
 
+function isLocalWorkoutSplitsEnvironment() {
+  return typeof PropertiesService === 'undefined';
+}
+
 function parseSplitSeconds(value) {
   const match = String(value || '').trim().match(/(\d+):([0-5]\d)(?:\.(\d+))?\s*$/);
   if (!match) return null;
@@ -111,6 +115,8 @@ function ensureWorkoutSplitSeparatorRows(sheet, sheetData) {
 }
 
 function clearSeparatorFormattingFromWorkoutRow(sheet, rowIndex) {
+  if (!isLocalWorkoutSplitsEnvironment()) return;
+
   const sheetRow = rowIndex + 1;
   sheet.getRange(sheetRow, 1, 1, WORKOUT_SPLITS_HEADERS.length).setBackground(null);
 
@@ -151,7 +157,11 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
       split.value,
       split.pace
     ]]);
-    if (splitIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    if (splitIndex === 0) {
+      sheet.getRange(rowIndex + 1, 1).setNumberFormat(
+        isLocalWorkoutSplitsEnvironment() ? 'mmmm d' : 'mmmm d, yyyy'
+      );
+    }
   });
 
   for (let columnIndex = 1; columnIndex <= 2; columnIndex++) {
@@ -167,7 +177,7 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(WORKOUT_SPLITS_SHEET_NAME)
     || spreadsheet.insertSheet(WORKOUT_SPLITS_SHEET_NAME);
   let sheetData = ensureWorkoutSplitsHeader(sheet, sheet.getDataRange().getValues());
-  normalizeSheetDateColumn(sheet, sheetData);
+  if (isLocalWorkoutSplitsEnvironment()) normalizeSheetDateColumn(sheet, sheetData);
 
   activities.filter(isRunningActivity).forEach(activity => {
     const workout = parseWorkout(activity.description);
@@ -179,21 +189,30 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
     sheetData = sheet.getDataRange().getValues();
   });
 
-  sheetData = ensureWorkoutSplitSeparatorRows(sheet, sheetData);
+  if (isLocalWorkoutSplitsEnvironment()) {
+    sheetData = ensureWorkoutSplitSeparatorRows(sheet, sheetData);
+  }
 
-  sheet.getRange(1, 1, Math.max(sheetData.length, 1), WORKOUT_SPLITS_HEADERS.length)
+  const contentRange = sheet.getRange(1, 1, Math.max(sheetData.length, 1), WORKOUT_SPLITS_HEADERS.length)
     .setWrap(true)
-    .setVerticalAlignment('middle')
-    .setHorizontalAlignment('left');
-  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-    if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    .setVerticalAlignment('middle');
+  if (isLocalWorkoutSplitsEnvironment()) {
+    contentRange.setHorizontalAlignment('left');
+    for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+      if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    }
   }
   if (sheetData.length > 1) {
     sheet.getRange(2, 1, sheetData.length - 1, 2)
       .setVerticalAlignment('top')
       .setHorizontalAlignment('left');
-    sheet.getRange(2, 1, sheetData.length - 1, WORKOUT_SPLITS_HEADERS.length)
-      .setFontWeight('normal');
+    if (isLocalWorkoutSplitsEnvironment()) {
+      sheet.getRange(2, 1, sheetData.length - 1, WORKOUT_SPLITS_HEADERS.length)
+        .setFontWeight('normal');
+    }
+  }
+  if (!isLocalWorkoutSplitsEnvironment()) {
+    sheet.getRange(1, 3, Math.max(sheetData.length, 1), 2).setHorizontalAlignment('left');
   }
   sheet.getRange(1, 1, 1, WORKOUT_SPLITS_HEADERS.length).setFontWeight('bold');
   sheet.setColumnWidth(1, 140);

@@ -61,6 +61,10 @@ function parseActivityDate(activity) {
   return new Date(year, month - 1, day, 0, 0, 0, 0);
 }
 
+function isLocalDevelopmentEnvironment() {
+  return typeof PropertiesService === 'undefined';
+}
+
 function normalizeSheetDateColumn(sheet, sheetData, startRowIndex = 1) {
   for (let rowIndex = startRowIndex; rowIndex < sheetData.length; rowIndex++) {
     const parsedDate = parseSheetDateValue(sheetData[rowIndex]?.[0]);

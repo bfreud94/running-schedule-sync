@@ -5,6 +5,7 @@
 .clasp.json
 .claspignore
 run-local.js
+sync-last-month.js
 push.ps1
 package.json
 node_modules/**

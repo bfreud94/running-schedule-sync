@@ -6,6 +6,10 @@ function getLocalScriptProperties() {
   };
 }
 
+function isLocalStravaEnvironment() {
+  return typeof PropertiesService === 'undefined';
+}
+
 function getAccessToken() {
   const isLocalEnvironment = typeof PropertiesService === 'undefined';
   const props = isLocalEnvironment
@@ -59,7 +63,9 @@ function fetchStravaResource(endpoint, accessToken) {
   if (statusCode !== 200) {
     const message = `Strava API request failed (${statusCode}) for ${endpoint}: ${response.getContentText()}`;
     Logger.log(message);
-    if (statusCode === 429) throw new Error(`${message} Retry after the rate limit resets.`);
+    if (statusCode === 429 && isLocalStravaEnvironment()) {
+      throw new Error(`${message} Retry after the rate limit resets.`);
+    }
     return null;
   }
 
@@ -69,7 +75,8 @@ function fetchStravaResource(endpoint, accessToken) {
 function fetchStravaActivityPage(startDate, page, accessToken) {
   const afterTimestamp = Math.floor(startDate.getTime() / 1000) - 1;
   const endpoint = `https://www.strava.com/api/v3/athlete/activities?after=${afterTimestamp}&page=${page}&per_page=100`;
-  return fetchStravaResource(endpoint, accessToken);
+  const activities = fetchStravaResource(endpoint, accessToken);
+  return isLocalStravaEnvironment() ? activities : activities || [];
 }
 
 function fetchStravaActivitySummariesSince(startDate, accessToken) {

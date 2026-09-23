@@ -3,6 +3,10 @@ const SUPPLEMENTAL_WORKOUTS_HEADERS = ['Date', 'Workout', 'Exercise', 'Sets', 'R
 const SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND = '#000000';
 const SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT = 10;
 
+function isLocalSupplementalWorkoutsEnvironment() {
+  return typeof PropertiesService === 'undefined';
+}
+
 function ensureSupplementalWorkoutsHeader(sheet, sheetData) {
   if (sheetData.length === 0 || !sheetData[0].some(value => String(value || '').trim())) {
     sheet.getRange(1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length).setValues([SUPPLEMENTAL_WORKOUTS_HEADERS]);
@@ -232,8 +236,9 @@ function ensureFinalSeparatorRow(sheet) {
   const separatorRow = lastRow + 1;
   const alreadyPainted = sheet.getRange(separatorRow, 1).getBackground()
     === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
-  const separatorIsInDataRange = sheet.getDataRange().getValues().length >= separatorRow;
-  if ((!alreadyPainted || !separatorIsInDataRange) && sheet.insertRows) {
+  const localSeparatorIsMissing = isLocalSupplementalWorkoutsEnvironment()
+    && sheet.getDataRange().getValues().length < separatorRow;
+  if ((!alreadyPainted || localSeparatorIsMissing) && sheet.insertRows) {
     sheet.insertRows(separatorRow, 1);
   }
 
@@ -277,9 +282,11 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
   sheetData = ensureHeaderSeparator(sheet, sheetData);
-  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
-  removeSupplementalWorkoutsBefore(sheet, sheet.getDataRange().getValues(), new Date(new Date().getFullYear(), 8, 15));
-  sheetData = sheet.getDataRange().getValues();
+  if (isLocalSupplementalWorkoutsEnvironment()) {
+    normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
+    removeSupplementalWorkoutsBefore(sheet, sheet.getDataRange().getValues(), new Date(new Date().getFullYear(), 8, 15));
+    sheetData = sheet.getDataRange().getValues();
+  }
 
   activities.forEach(activity => {
     const exercises = parseSupplementalWorkoutDetails(activity.description).exercises;
@@ -321,17 +328,26 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
-  clearBlackFromWorkoutRows(sheet, sheetData);
-  matchSupplementalFontToRowThree(sheet, sheetData);
+  if (isLocalSupplementalWorkoutsEnvironment()) {
+    clearBlackFromWorkoutRows(sheet, sheetData);
+    matchSupplementalFontToRowThree(sheet, sheetData);
+  } else {
+    ensureDaySeparatorRows(sheet, sheetData);
+    ensureFinalSeparatorRow(sheet);
+    sheetData = sheet.getDataRange().getValues();
+    fillMissingSeparatorColumns(sheet, sheetData);
+    forceKnownSeparatorRow(sheet, 12);
+  }
 
-  sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
+  const contentRange = sheet.getRange(1, 1, Math.max(sheetData.length, 1), SUPPLEMENTAL_WORKOUTS_HEADERS.length)
     .setWrap(true)
     .setVerticalAlignment('middle')
-    .setHorizontalAlignment('left')
-    .setFontFamily(null)
-    .setFontSize(null);
-  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-    if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    .setHorizontalAlignment('left');
+  if (isLocalSupplementalWorkoutsEnvironment()) {
+    contentRange.setFontFamily(null).setFontSize(null);
+    for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+      if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    }
   }
   if (sheetData.length > 1) {
     sheet.getRange(2, 1, sheetData.length - 1, 2)
@@ -346,5 +362,5 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sheet.setColumnWidth(5, 140);
   sheet.setColumnWidth(6, 150);
   sheet.setColumnWidth(7, 220);
-  ensureFinalSeparatorRow(sheet);
+  if (isLocalSupplementalWorkoutsEnvironment()) ensureFinalSeparatorRow(sheet);
 }
