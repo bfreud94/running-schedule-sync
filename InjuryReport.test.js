@@ -3,6 +3,30 @@ const { readFileSync } = require('node:fs');
 const test = require('node:test');
 const vm = require('node:vm');
 
+test('creates only the stable Injury Report sheet', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('InjuryReport.js', 'utf8');
+  const sheetNames = [];
+  const spreadsheet = {
+    getSheetByName: name => {
+      sheetNames.push({ method: 'getSheetByName', name });
+      return null;
+    },
+    insertSheet: name => {
+      sheetNames.push({ method: 'insertSheet', name });
+      return { name };
+    }
+  };
+
+  vm.runInContext(`${source}\nglobalThis.sheetTarget = getOrCreateInjuryReportSheet;`, context);
+
+  assert.deepEqual(context.sheetTarget(spreadsheet), { name: 'Injury Report' });
+  assert.deepEqual(sheetNames, [
+    { method: 'getSheetByName', name: 'Injury Report' },
+    { method: 'insertSheet', name: 'Injury Report' }
+  ]);
+});
+
 test('parses the body part from the Area line after Injury Report', () => {
   const context = vm.createContext({ console });
   const source = readFileSync('InjuryReport.js', 'utf8');

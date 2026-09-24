@@ -5,6 +5,7 @@ const { getAuthenticatedClient } = require('./googleAuth');
 const { renderSpreadsheetHtml } = require('./SpreadsheetHtml');
 
 const ROOT = path.resolve(__dirname, '..');
+const SPREADSHEET_NAME = '2026 Running Schedule';
 const SPREADSHEET_ID = '1JM5PwBXCGw9HJiJbnPSTqhcg_ai1EZbGdwVKhf9m47E';
 const fixturePath = path.join(ROOT, 'fixtures', 'spreadsheet.json');
 const outputPath = path.join(ROOT, 'output', 'spreadsheet.json');
@@ -30,7 +31,7 @@ function applyLocalBoldFormatting(workbook) {
 }
 
 function applyLocalDateFormatting(workbook) {
-  ['2026 Injury Report', 'Supplemental Workouts', 'Workout Splits'].forEach(sheetName => {
+  ['Injury Report', 'Supplemental Workouts', 'Workout Splits'].forEach(sheetName => {
     const sheet = workbook.sheets?.[sheetName];
     if (!sheet) return;
 
@@ -48,6 +49,15 @@ function applyLocalDateFormatting(workbook) {
 async function syncPlannedSchedule() {
   const auth = await getAuthenticatedClient();
   const sheets = google.sheets({ version: 'v4', auth });
+  const spreadsheet = await sheets.spreadsheets.get({
+    spreadsheetId: SPREADSHEET_ID,
+    fields: 'properties.title'
+  });
+  const spreadsheetTitle = spreadsheet.data.properties?.title;
+  if (spreadsheetTitle !== SPREADSHEET_NAME) {
+    throw new Error(`Expected spreadsheet "${SPREADSHEET_NAME}" but found "${spreadsheetTitle || 'unknown'}".`);
+  }
+
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
     range: 'Planned Schedule'
@@ -61,7 +71,7 @@ async function syncPlannedSchedule() {
   writeFileSync(fixturePath, serializedWorkbook);
   writeFileSync(outputPath, serializedWorkbook);
   writeFileSync(outputHtmlPath, renderSpreadsheetHtml(workbook, []));
-  console.log(`Synced ${workbook.sheets['Planned Schedule'].values.length} Planned Schedule rows to fixtures/spreadsheet.json.`);
+  console.log(`Synced ${workbook.sheets['Planned Schedule'].values.length} Planned Schedule rows from ${SPREADSHEET_NAME} to fixtures/spreadsheet.json.`);
   console.log('Updated output/spreadsheet.json and output/spreadsheet.html.');
 }
 

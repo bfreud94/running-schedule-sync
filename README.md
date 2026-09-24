@@ -11,8 +11,8 @@ The script is bound to a Google Sheet with (up to) four tabs:
 - **Actual Runs** — one row per training week, one column per day (Mon–Sun) plus a weekly total.
 - **Planned Schedule** — the same layout, but with the planned mileage/rest days for comparison.
 - **Workout Splits** — a log of interval/workout splits parsed out of Strava activity descriptions.
-- **`<year> Injury Report`** — a sheet (one per year, auto-created) with a row per day and a column
-  per reported body part, color-coded by injury severity.
+- **Injury Report** — a sheet with a row per day and a column per reported body part,
+  color-coded by injury severity.
 
 The entry point is `syncStravaToActualRuns()` (in [DataPlacement.js](DataPlacement.js)), which is
 meant to be run on a time-driven trigger (e.g. daily). Each run:

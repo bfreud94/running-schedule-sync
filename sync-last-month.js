@@ -135,7 +135,7 @@ function syncLastMonth() {
   const supplementalWorkoutsStart = getCurrentYearCutoff(8, 15, currentDate);
   const activities = fetchStravaActivitiesSince(monthStart);
   const weekStarts = getCoveredWeekStarts(getMondayOnOrAfter(monthStart), currentMonday);
-  const injuryReportSheet = getOrCreateInjuryReportSheet(spreadsheet, currentDate);
+  const injuryReportSheet = getOrCreateInjuryReportSheet(spreadsheet);
 
   weekStarts.forEach(targetMonday => {
     const targetRowIndex = ensureActualWeekRow(actualSheet, targetMonday);

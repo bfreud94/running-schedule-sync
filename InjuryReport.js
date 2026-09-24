@@ -1,14 +1,11 @@
-function getInjuryReportSheetName(date = new Date()) {
-  return `${date.getFullYear()} Injury Report`;
-}
+const INJURY_REPORT_SHEET_NAME = 'Injury Report';
 
 function isLocalInjuryReportEnvironment() {
   return typeof PropertiesService === 'undefined';
 }
 
-function getOrCreateInjuryReportSheet(spreadsheet, date = new Date()) {
-  const sheetName = getInjuryReportSheetName(date);
-  return spreadsheet.getSheetByName(sheetName) || spreadsheet.insertSheet(sheetName);
+function getOrCreateInjuryReportSheet(spreadsheet) {
+  return spreadsheet.getSheetByName(INJURY_REPORT_SHEET_NAME) || spreadsheet.insertSheet(INJURY_REPORT_SHEET_NAME);
 }
 
 function parseInjuryReports(description) {
