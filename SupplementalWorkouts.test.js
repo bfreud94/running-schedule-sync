@@ -73,6 +73,30 @@ test('copies row 3 font family and size across the Supplemental Workouts sheet',
   ]);
 });
 
+test('restores normal row height when workout data replaces a separator', () => {
+  const resizedRows = [];
+  const backgrounds = [];
+  const sheet = {
+    autoResizeRows: (row, count) => { resizedRows.push({ row, count }); },
+    getRange: (row, column, numRows, numColumns) => ({
+      setBackground: value => { backgrounds.push({ row, column, numRows, numColumns, value }); }
+    })
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.clearWorkoutRowsTarget = clearBlackFromWorkoutRows;', context);
+
+  context.clearWorkoutRowsTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    [new Date(2026, 8, 24), 'Upper Body Lift', 'Bench Press', '3', '8', '80 lbs', '']
+  ]);
+
+  assert.deepEqual(resizedRows, [{ row: 3, count: 1 }]);
+  assert.deepEqual(backgrounds, [
+    { row: 3, column: 1, numRows: 1, numColumns: 7, value: null }
+  ]);
+});
+
 test('adds a separator after the final day block when it is missing', () => {
   const writes = [];
   const sheet = {

@@ -3,5 +3,12 @@ node_modules/
 .env
 output/
 .local/
+fixtures/spreadsheet.json
+local-*.log
+npm-test.log
+local-report.txt
+local-run.txt
+test-report.txt
+test-run.txt
 local/google-oauth-client.json
 local/mocks/*.json

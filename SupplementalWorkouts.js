@@ -261,6 +261,7 @@ function forceKnownSeparatorRow(sheet, rowNumber) {
 function clearBlackFromWorkoutRows(sheet, sheetData) {
   sheetData.forEach((row, rowIndex) => {
     if (rowIndex === 0 || isBlankRow(row)) return;
+    sheet.autoResizeRows?.(rowIndex + 1, 1);
     sheet.getRange(rowIndex + 1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length)
       .setBackground(null);
   });

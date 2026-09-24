@@ -36,6 +36,9 @@ function syncStravaToActualRuns() {
   const dailySupplementalWorkouts = calculateDailySupplementalWorkouts(activities, targetMonday);
 
   updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts);
+  if (isLocalDevelopmentEnvironment()) {
+    applyDailyCellStyles(actualSheet, targetRowIndex, plannedRow, todayOffset);
+  }
   updateWorkoutSplitsSheet(spreadsheet, activities);
   updateSupplementalWorkoutsSheet(spreadsheet, activities);
   updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
