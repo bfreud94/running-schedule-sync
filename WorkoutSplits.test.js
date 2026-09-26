@@ -127,6 +127,66 @@ test('writes the date as plain text formatted as "Month Day" instead of a Date-t
   assert.deepEqual(numberFormats, [{ row: 2, column: 1, value: '@' }]);
 });
 
+test('matches an existing plain-text date row regardless of year, overwriting instead of duplicating', () => {
+  const written = [];
+  const sheet = {
+    autoResizeRows: () => {},
+    setRowHeight: () => {},
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        setValues: values => { written.push({ row, column, values: values[0] }); },
+        setNumberFormat: () => {},
+        setFontWeight: () => {},
+        setBackground: () => {},
+        getBackground: () => '#ffffff',
+        breakApart: () => {},
+        merge: () => ({ setVerticalAlignment: () => {} })
+      };
+    }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.writeTarget = writeWorkoutSplitRows;`, context);
+  context.writeTarget(
+    sheet,
+    [
+      ['Date', 'Workout', 'Splits', 'Splits (Pace)'],
+      ['September 24', '1000m repeats', '4:47', '7:42']
+    ],
+    new Date(2026, 8, 24),
+    '1000m repeats',
+    [{ value: '4:47', pace: '7:42' }]
+  );
+
+  assert.equal(written.find(entry => entry.row === 2 && entry.column === 1)?.values[0], 'September 24');
+  assert.equal(written.some(entry => entry.row === 3), false);
+});
+
+test('removes duplicate day blocks, keeping the most recent one', () => {
+  const deletedRows = [];
+  const sheetData = [
+    ['Date', 'Workout', 'Splits', 'Splits (Pace)'],
+    ['September 24', '1000m repeats', '4:47', '7:42'],
+    [],
+    ['September 25', 'Easy run', '3:00', ''],
+    [],
+    ['September 24', '1000m repeats', '4:47', '7:42'],
+    []
+  ];
+  const sheet = {
+    deleteRows: (row, count) => { deletedRows.push({ row, count }); }
+  };
+  const context = vm.createContext({ console });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.dedupeTarget = removeDuplicateWorkoutSplitBlocks;`, context);
+  const removedAny = context.dedupeTarget(sheet, sheetData);
+
+  assert.equal(removedAny, true);
+  assert.deepEqual(deletedRows, [{ row: 2, count: 2 }]);
+});
+
 test('bolds the date cell when writing a workout split row', () => {
   const fontWeights = [];
   const sheet = {

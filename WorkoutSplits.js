@@ -11,6 +11,20 @@ function formatWorkoutSplitsDateText(date) {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 }
 
+// Plain-text "Month Day" cells carry no year, so matching must compare month/day only.
+function parseWorkoutSplitsRowDate(value) {
+  if (value instanceof Date) return value;
+  const match = String(value || '').trim().match(/^([A-Za-z]+)\s+(\d{1,2})$/);
+  if (!match) return null;
+
+  const parsedDate = new Date(`${match[1]} ${match[2]}, 2000`);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+}
+
+function isSameWorkoutSplitsDay(left, right) {
+  return left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
+}
+
 function parseSplitSeconds(value) {
   const match = String(value || '').trim().match(/(\d+):([0-5]\d)(?:\.(\d+))?\s*$/);
   if (!match) return null;
@@ -87,6 +101,54 @@ function isWorkoutSplitsBlankRow(row) {
   return !row || row.every(value => String(value || '').trim() === '');
 }
 
+function getAllWorkoutSplitsBlocks(sheetData) {
+  const blocks = [];
+  let blockStartIndex = null;
+
+  for (let rowIndex = 1; rowIndex <= sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    const isBoundary = rowIndex === sheetData.length || isWorkoutSplitsBlankRow(row);
+
+    if (isBoundary) {
+      if (blockStartIndex !== null) {
+        blocks.push({ startRowIndex: blockStartIndex, rowCount: rowIndex - blockStartIndex });
+        blockStartIndex = null;
+      }
+      continue;
+    }
+
+    if (blockStartIndex === null) blockStartIndex = rowIndex;
+  }
+
+  return blocks;
+}
+
+function removeDuplicateWorkoutSplitBlocks(sheet, sheetData) {
+  const blocks = getAllWorkoutSplitsBlocks(sheetData);
+  const lastBlockBySignature = new Map();
+  const duplicateBlocks = [];
+
+  blocks.forEach(block => {
+    const anchorRow = sheetData[block.startRowIndex];
+    const dateText = String(anchorRow?.[0] || '').trim();
+    const workoutText = String(anchorRow?.[1] || '').trim();
+    if (!dateText || !workoutText) return;
+
+    const signature = `${dateText}|${workoutText}`;
+    const previousBlock = lastBlockBySignature.get(signature);
+    if (previousBlock) duplicateBlocks.push(previousBlock);
+    lastBlockBySignature.set(signature, block);
+  });
+
+  duplicateBlocks
+    .sort((left, right) => right.startRowIndex - left.startRowIndex)
+    .forEach(block => {
+      sheet.deleteRows(block.startRowIndex + 1, block.rowCount + 1);
+    });
+
+  return duplicateBlocks.length > 0;
+}
+
 function ensureWorkoutSplitSeparatorRows(sheet, sheetData) {
   const headerSeparatorIsMissing = !isWorkoutSplitsBlankRow(sheetData[1]);
   if (headerSeparatorIsMissing || sheetData.length < 2) sheet.insertRows(2, 1);
@@ -142,11 +204,10 @@ function findAppendRowIndex(sheet, sheetData) {
 }
 
 function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) {
-  const dateKey = getDateKey(activityDate);
   const firstRowIndex = sheetData.findIndex((row, index) => {
     if (index === 0) return false;
-    const rowDate = parseSheetDate(row[0]);
-    return rowDate && getDateKey(rowDate) === dateKey && String(row[1] || '').trim() === workout;
+    const rowDate = parseWorkoutSplitsRowDate(row[0]);
+    return rowDate && isSameWorkoutSplitsDay(rowDate, activityDate) && String(row[1] || '').trim() === workout;
   });
   const startRowIndex = firstRowIndex === -1 ? findAppendRowIndex(sheet, sheetData) : firstRowIndex;
   const activityRange = sheet.getRange(startRowIndex + 1, 1, splits.length, 2);
@@ -180,6 +241,7 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(WORKOUT_SPLITS_SHEET_NAME)
     || spreadsheet.insertSheet(WORKOUT_SPLITS_SHEET_NAME);
   let sheetData = ensureWorkoutSplitsHeader(sheet, sheet.getDataRange().getValues());
+  if (removeDuplicateWorkoutSplitBlocks(sheet, sheetData)) sheetData = sheet.getDataRange().getValues();
 
   activities.filter(isRunningActivity).forEach(activity => {
     const workout = parseWorkout(activity.description);
