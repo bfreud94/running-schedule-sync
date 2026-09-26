@@ -40,7 +40,7 @@ function parseSupplementalExerciseLine(line, category) {
 
   const workout = match[1].trim();
   const details = String(match[2] || '').trim();
-  const structuredSetsMatch = details.match(/^(\d+)\s+sets?\s*;\s*(.+)$/i);
+  const structuredSetsMatch = details.match(/^(\d+)\s+sets?\s*[;,]\s*(.+)$/i);
   if (structuredSetsMatch) {
     const setDetails = structuredSetsMatch[2].split(',').map(part => part.trim()).filter(Boolean);
     const reps = [];
@@ -49,13 +49,20 @@ function parseSupplementalExerciseLine(line, category) {
 
     setDetails.forEach(detail => {
       const setMatch = detail.match(/^(.+?)\s+reps?\s*@\s*(.+)$/i);
-      if (!setMatch) {
-        notes.push(detail);
+      if (setMatch) {
+        reps.push(setMatch[1].trim());
+        weights.push(setMatch[2].trim());
         return;
       }
 
-      reps.push(setMatch[1].trim());
-      weights.push(setMatch[2].trim());
+      // A single "N reps" entry (no @ weight) applies uniformly across all sets.
+      const repsOnlyMatch = detail.match(/^(.+?)\s+reps?$/i);
+      if (repsOnlyMatch) {
+        reps.push(repsOnlyMatch[1].trim());
+        return;
+      }
+
+      notes.push(detail);
     });
 
     return {

@@ -120,6 +120,25 @@ test('parses semicolon-separated sets with per-set reps and weights', () => {
   ]);
 });
 
+test('parses comma-separated sets with a single rep count and no weight', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('RunningMetrics.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.detailsTarget = parseSupplementalWorkoutDetails;`, context);
+
+  const details = JSON.parse(JSON.stringify(context.detailsTarget([
+    'Supplemental Workouts:',
+    'Legs:',
+    '1. Squats (3 sets, 8 reps)',
+    '2. Copenhagen Planks (3 sets, 8 reps, both sides)'
+  ].join('\n'))));
+
+  assert.deepEqual(details.exercises, [
+    { category: 'Legs', workout: 'Squats', sets: '3', repsHoldTime: '8', weight: 'N/A', notes: '' },
+    { category: 'Legs', workout: 'Copenhagen Planks', sets: '3', repsHoldTime: '8', weight: 'N/A', notes: 'both sides' }
+  ]);
+});
+
 test('keeps multiple supplemental areas separated by a blank line', () => {
   const context = vm.createContext({ console });
   const source = readFileSync('RunningMetrics.js', 'utf8');
