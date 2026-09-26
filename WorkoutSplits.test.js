@@ -89,6 +89,44 @@ test('adds 10px black separator rows around each workout day', () => {
   ]);
 });
 
+test('writes the date as plain text formatted as "Month Day" instead of a Date-typed cell', () => {
+  const values = [];
+  const numberFormats = [];
+  const sheet = {
+    autoResizeRows: () => {},
+    setRowHeight: () => {},
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        setValues: rowValues => { values.push({ row, column, rowValues: rowValues[0] }); },
+        setNumberFormat: value => { numberFormats.push({ row, column, value }); },
+        setFontWeight: () => {},
+        setBackground: () => {},
+        getBackground: () => '#ffffff',
+        breakApart: () => {},
+        merge: () => ({ setVerticalAlignment: () => {} })
+      };
+    }
+  };
+  const context = vm.createContext({
+    console,
+    getDateKey: date => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
+    parseSheetDate: value => value instanceof Date ? value : null
+  });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.writeTarget = writeWorkoutSplitRows;`, context);
+  context.writeTarget(
+    sheet,
+    [['Date', 'Workout', 'Splits', 'Splits (Pace)']],
+    new Date(2026, 8, 24),
+    '1000m repeats',
+    [{ value: '4:47', pace: '7:42' }]
+  );
+
+  assert.equal(values[0].rowValues[0], 'September 24');
+  assert.deepEqual(numberFormats, [{ row: 2, column: 1, value: '@' }]);
+});
+
 test('bolds the date cell when writing a workout split row', () => {
   const fontWeights = [];
   const sheet = {

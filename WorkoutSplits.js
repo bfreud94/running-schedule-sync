@@ -7,6 +7,10 @@ function isLocalWorkoutSplitsEnvironment() {
   return typeof PropertiesService === 'undefined';
 }
 
+function formatWorkoutSplitsDateText(date) {
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
 function parseSplitSeconds(value) {
   const match = String(value || '').trim().match(/(\d+):([0-5]\d)(?:\.(\d+))?\s*$/);
   if (!match) return null;
@@ -151,16 +155,14 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
   splits.forEach((split, splitIndex) => {
     const rowIndex = startRowIndex + splitIndex;
     clearSeparatorFormattingFromWorkoutRow(sheet, rowIndex);
+    if (splitIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('@');
     sheet.getRange(rowIndex + 1, 1, 1, WORKOUT_SPLITS_HEADERS.length).setValues([[
-      splitIndex === 0 ? activityDate : '',
+      splitIndex === 0 ? formatWorkoutSplitsDateText(activityDate) : '',
       splitIndex === 0 ? workout : '',
       split.value,
       split.pace
     ]]);
     if (splitIndex === 0) {
-      sheet.getRange(rowIndex + 1, 1).setNumberFormat(
-        isLocalWorkoutSplitsEnvironment() ? 'mmmm d' : 'mmmm d, yyyy'
-      );
       sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
     }
   });
@@ -178,7 +180,6 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   const sheet = spreadsheet.getSheetByName(WORKOUT_SPLITS_SHEET_NAME)
     || spreadsheet.insertSheet(WORKOUT_SPLITS_SHEET_NAME);
   let sheetData = ensureWorkoutSplitsHeader(sheet, sheet.getDataRange().getValues());
-  if (isLocalWorkoutSplitsEnvironment()) normalizeSheetDateColumn(sheet, sheetData);
 
   activities.filter(isRunningActivity).forEach(activity => {
     const workout = parseWorkout(activity.description);
@@ -200,10 +201,14 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   if (isLocalWorkoutSplitsEnvironment()) {
     contentRange.setHorizontalAlignment('left');
     for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-      if (sheetData[rowIndex]?.[0]) {
-        sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
-        sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
-      }
+      const cellValue = sheetData[rowIndex]?.[0];
+      if (!cellValue) continue;
+
+      // Legacy Date-typed cells (from before dates became plain text) get migrated on the next local run.
+      const dateCell = sheet.getRange(rowIndex + 1, 1);
+      dateCell.setNumberFormat('@');
+      if (cellValue instanceof Date) dateCell.setValue(formatWorkoutSplitsDateText(cellValue));
+      dateCell.setFontWeight('bold');
     }
   }
   if (sheetData.length > 1) {
