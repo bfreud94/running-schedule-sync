@@ -167,7 +167,10 @@ function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group
       exercise.weight,
       exercise.notes
     ]]);
-    if (exerciseIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+    if (exerciseIndex === 0) {
+      sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+      sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
+    }
   });
 
   for (let columnIndex = 1; columnIndex <= 2; columnIndex++) {
@@ -347,7 +350,10 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   if (isLocalSupplementalWorkoutsEnvironment()) {
     contentRange.setFontFamily(null).setFontSize(null);
     for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-      if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+      if (sheetData[rowIndex]?.[0]) {
+        sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+        sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
+      }
     }
   }
   if (sheetData.length > 1) {

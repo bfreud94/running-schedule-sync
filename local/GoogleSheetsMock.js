@@ -2,8 +2,15 @@ const { mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const { renderSpreadsheetHtml } = require('./SpreadsheetHtml');
 
+const ISO_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/;
+
+// JSON.stringify turns Date cells into ISO strings; revive them so they format as "September 26" again.
+function reviveDates(key, value) {
+  return typeof value === 'string' && ISO_DATE_TIME_PATTERN.test(value) ? new Date(value) : value;
+}
+
 function createGoogleSheetsMock(fixturePath, outputPath) {
-  const workbook = JSON.parse(readFileSync(fixturePath, 'utf8'));
+  const workbook = JSON.parse(readFileSync(fixturePath, 'utf8'), reviveDates);
   const changes = [];
 
   function getSheet(name) {

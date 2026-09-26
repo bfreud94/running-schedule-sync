@@ -89,6 +89,42 @@ test('adds 10px black separator rows around each workout day', () => {
   ]);
 });
 
+test('bolds the date cell when writing a workout split row', () => {
+  const fontWeights = [];
+  const sheet = {
+    autoResizeRows: () => {},
+    setRowHeight: () => {},
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        setValues: () => ({ setNumberFormat: () => {} }),
+        setNumberFormat: () => {},
+        setFontWeight: value => { fontWeights.push({ row, column, value }); },
+        setBackground: () => {},
+        getBackground: () => '#ffffff',
+        breakApart: () => {},
+        merge: () => ({ setVerticalAlignment: () => {} })
+      };
+    }
+  };
+  const context = vm.createContext({
+    console,
+    getDateKey: date => `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
+    parseSheetDate: value => value instanceof Date ? value : null
+  });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.writeTarget = writeWorkoutSplitRows;`, context);
+  context.writeTarget(
+    sheet,
+    [['Date', 'Workout', 'Splits', 'Splits (Pace)']],
+    new Date(2026, 8, 4),
+    '1000m repeats',
+    [{ value: '4:47', pace: '7:42' }]
+  );
+
+  assert.deepEqual(fontWeights, [{ row: 2, column: 1, value: 'bold' }]);
+});
+
 test('merges date and workout cells across the split rows', () => {
   const mergedRanges = [];
   const backgrounds = [];
@@ -101,6 +137,7 @@ test('merges date and workout cells across the split rows', () => {
       return {
         setValues: () => ({ setNumberFormat: () => {} }),
         setNumberFormat: () => {},
+        setFontWeight: () => {},
         setBackground: value => { backgrounds.push({ row, column, value }); },
         getBackground: () => '#ffffff',
         breakApart: () => {},

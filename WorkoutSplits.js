@@ -161,6 +161,7 @@ function writeWorkoutSplitRows(sheet, sheetData, activityDate, workout, splits) 
       sheet.getRange(rowIndex + 1, 1).setNumberFormat(
         isLocalWorkoutSplitsEnvironment() ? 'mmmm d' : 'mmmm d, yyyy'
       );
+      sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
     }
   });
 
@@ -199,7 +200,10 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
   if (isLocalWorkoutSplitsEnvironment()) {
     contentRange.setHorizontalAlignment('left');
     for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-      if (sheetData[rowIndex]?.[0]) sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+      if (sheetData[rowIndex]?.[0]) {
+        sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+        sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
+      }
     }
   }
   if (sheetData.length > 1) {
@@ -207,7 +211,8 @@ function updateWorkoutSplitsSheet(spreadsheet, activities) {
       .setVerticalAlignment('top')
       .setHorizontalAlignment('left');
     if (isLocalWorkoutSplitsEnvironment()) {
-      sheet.getRange(2, 1, sheetData.length - 1, WORKOUT_SPLITS_HEADERS.length)
+      // Column 1 holds bolded dates; only body columns 2+ reset to normal weight.
+      sheet.getRange(2, 2, sheetData.length - 1, WORKOUT_SPLITS_HEADERS.length - 1)
         .setFontWeight('normal');
     }
   }

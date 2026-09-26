@@ -187,6 +187,31 @@ test('groups exercises by category, preserving first-seen order', () => {
   assert.equal(groups[1].category, 'Upper Body');
 });
 
+test('bolds the date cell when writing a supplemental workout group', () => {
+  const fontWeights = [];
+  const sheet = {
+    getRange(row, column) {
+      return {
+        setValues: () => this,
+        setNumberFormat: () => this,
+        setFontWeight: value => { fontWeights.push({ row, column, value }); },
+        merge: () => ({ setVerticalAlignment: () => {} })
+      };
+    }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.writeGroupTarget = writeSupplementalWorkoutGroup;', context);
+
+  context.writeGroupTarget(sheet, 1, new Date(2026, 8, 16), {
+    category: 'Core',
+    exercises: [
+      { workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' }
+    ]
+  });
+
+  assert.deepEqual(fontWeights, [{ row: 2, column: 1, value: 'bold' }]);
+});
+
 test('writes one merged row block per category', () => {
   const values = [];
   const merges = [];
@@ -195,6 +220,7 @@ test('writes one merged row block per category', () => {
       return {
         setValues: rowValues => { values.push({ row, column, rowValues: rowValues[0] }); return this; },
         setNumberFormat: () => this,
+        setFontWeight: () => this,
         merge: () => { merges.push({ row, column, numRows, numColumns }); return { setVerticalAlignment: () => {} }; }
       };
     }
