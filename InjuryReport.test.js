@@ -235,7 +235,7 @@ test('removes dated injury rows before August 31 and keeps the cutoff date', () 
     getDataRange: () => ({ getValues: () => values })
   };
   const context = vm.createContext({ console });
-  const source = readFileSync('InjuryReport.js', 'utf8');
+  const source = `${readFileSync('DateUtils.js', 'utf8')}\n${readFileSync('InjuryReport.js', 'utf8')}`;
   vm.runInContext(`${source}\nglobalThis.removeBeforeTarget = removeInjuryReportsBefore;`, context);
 
   const remaining = context.removeBeforeTarget(sheet, values, new Date(2026, 7, 31));

@@ -12,7 +12,7 @@ function loadContext() {
     getDateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
     parseSheetDate: value => value instanceof Date ? value : null
   });
-  const source = readFileSync('SupplementalWorkouts.js', 'utf8');
+  const source = `${readFileSync('DateUtils.js', 'utf8')}\n${readFileSync('SupplementalWorkouts.js', 'utf8')}`;
   vm.runInContext(source, context);
   return context;
 }
@@ -237,7 +237,7 @@ test('writes one merged row block per category', () => {
   });
 
   assert.equal(nextRowIndex, 3);
-  assert.deepEqual(JSON.parse(JSON.stringify(values[0].rowValues)), JSON.parse(JSON.stringify([new Date(2026, 8, 16), 'Core', 'Planks', '2', '1:30', 'N/A', ''])));
+  assert.deepEqual(JSON.parse(JSON.stringify(values[0].rowValues)), ['September 16', 'Core', 'Planks', '2', '1:30', 'N/A', '']);
   assert.deepEqual(JSON.parse(JSON.stringify(values[1].rowValues)), ['', '', 'Side Planks', '2', '1:00', 'N/A', 'each side']);
   assert.deepEqual(JSON.parse(JSON.stringify(merges)), [
     { row: 2, column: 1, numRows: 2, numColumns: 1 },
@@ -269,6 +269,85 @@ test('finds an existing day block and reconstructs its groups', () => {
   ]));
 
   assert.equal(context.findBlockTarget(sheetData, '2026-09-18'), null);
+});
+
+test('detects the Non Running Day note regardless of case, dashes, or underscores', () => {
+  const context = loadContext();
+  vm.runInContext('globalThis.noteTarget = isNonRunningDayNote;', context);
+
+  assert.equal(context.noteTarget('Non Running Day'), true);
+  assert.equal(context.noteTarget('non running day'), true);
+  assert.equal(context.noteTarget('NON-RUNNING-DAY'), true);
+  assert.equal(context.noteTarget('Non_Running_Day'), true);
+  assert.equal(context.noteTarget('rest day, non-running day'), true);
+  assert.equal(context.noteTarget('felt good'), false);
+  assert.equal(context.noteTarget(''), false);
+});
+
+test('does not prune a Non Running Day block that falls before the cutoff', () => {
+  const deletedRows = [];
+  const sheet = { deleteRows: (row, count) => { deletedRows.push({ row, count }); } };
+  const context = loadContext();
+  vm.runInContext('globalThis.removeBeforeTarget = removeSupplementalWorkoutsBefore;', context);
+
+  context.removeBeforeTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [new Date(2026, 8, 1), 'Core', 'Planks', '2', '1:00', 'N/A', 'Non Running Day'],
+    [],
+    [new Date(2026, 8, 2), 'Core', 'Planks', '2', '1:00', 'N/A', '']
+  ], new Date(2026, 8, 15));
+
+  assert.deepEqual(deletedRows, [{ row: 4, count: 2 }]);
+});
+
+test('preserves a manually entered Non Running Day block instead of overwriting it', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-workouts-rest-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+
+  writeFileSync(fixturePath, JSON.stringify({
+    sheets: {
+      'Supplemental Workouts': {
+        values: [
+          ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+          [],
+          ['2026-09-16T04:00:00.000Z', 'Core', 'Manual Planks', '5', '2:00', 'N/A', 'Non Running Day'],
+          []
+        ]
+      }
+    }
+  }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+    const source = [
+      readFileSync('DateUtils.js', 'utf8'),
+      readFileSync('RunningMetrics.js', 'utf8'),
+      readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SupplementalWorkouts.js', 'utf8')
+    ].join('\n');
+    vm.runInContext(source, context);
+    vm.runInContext(
+      'updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), globalThis.__activities)',
+      Object.assign(context, { __activities: [{
+        start_date_local: '2026-09-16T13:00:00Z',
+        description: 'Supplemental Workouts:\nCore\n1. Planks (1x1:00)'
+      }] })
+    );
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    const values = saved.sheets['Supplemental Workouts'].values;
+    const manualRow = values.find(row => row?.[2] === 'Manual Planks');
+
+    assert.ok(manualRow, 'the manually entered row should still be present');
+    assert.equal(manualRow[3], '5');
+    assert.equal(manualRow[6], 'Non Running Day');
+    assert.equal(values.some(row => row?.[2] === 'Planks'), false);
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('overwrites a day already recorded when its exercises change', () => {
@@ -352,7 +431,7 @@ test('keeps day blocks in chronological order even when activities arrive out of
     }]);
 
     const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
-    assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
+    assert.deepEqual(dateCells, ['September 15', 'September 17']);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
@@ -393,7 +472,7 @@ test('re-sorts an already out-of-order sheet even with no new activities', () =>
     const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
     const values = saved.sheets['Supplemental Workouts'].values;
     const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
-    assert.deepEqual(dateCells, ['2026-09-15T04:00:00.000Z', '2026-09-17T04:00:00.000Z']);
+    assert.deepEqual(dateCells, ['September 15', 'September 17']);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }

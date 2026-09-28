@@ -7,6 +7,8 @@
     "local": "node ./local/local-command.js",
     "auth:google": "node ./local/setup-google-auth.js",
     "update:planned": "node ./local/sync-planned-schedule.js",
+    "update:supworkouts": "node ./local/sync-supplemental-workouts.js",
+    "update:all": "node ./local/sync-production-tabs.js",
     "push": "powershell -NoProfile -ExecutionPolicy Bypass -File ./push.ps1"
   },
   "dependencies": {

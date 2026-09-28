@@ -71,9 +71,27 @@ function normalizeSheetDateColumn(sheet, sheetData, startRowIndex = 1) {
     if (!parsedDate) continue;
 
     sheet.getRange(rowIndex + 1, 1)
-      .setValue(parsedDate)
-      .setNumberFormat('mmmm d');
+      .setNumberFormat('@')
+      .setValue(formatSheetDateText(parsedDate));
   }
+}
+
+function formatSheetDateText(date) {
+  return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+}
+
+// Sheet dates are stored as plain "Month Day" text, so the year comes from the current year.
+function parseSheetDateText(value) {
+  if (value instanceof Date) return getStartOfDay(value);
+
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  const monthDayMatch = text.match(/^([A-Za-z]+)\s+(\d{1,2})$/);
+  const parsedDate = monthDayMatch
+    ? new Date(`${monthDayMatch[1]} ${monthDayMatch[2]}, ${new Date().getFullYear()}`)
+    : new Date(text);
+  return Number.isNaN(parsedDate.getTime()) ? null : getStartOfDay(parsedDate);
 }
 
 function parseSheetDateValue(value) {

@@ -1,3 +1,13 @@
+const INDENT = '  ';
+
+function indentBlock(text, depth) {
+  const padding = INDENT.repeat(depth);
+  return text
+    .split('\n')
+    .map(line => (line ? `${padding}${line}` : line))
+    .join('\n');
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -12,6 +22,10 @@ function formatCellValue(value) {
     return value.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   }
   return value;
+}
+
+function renderCellContent(value) {
+  return escapeHtml(formatCellValue(value)).replaceAll(/\r?\n/g, '<br>');
 }
 
 function renderSheet(name, sheet, changes) {
@@ -64,30 +78,50 @@ function renderSheet(name, sheet, changes) {
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       const rowSpan = mergedCell && mergedCell.rowSpan > 1 ? ` rowspan="${mergedCell.rowSpan}"` : '';
       const columnSpan = mergedCell && mergedCell.columnSpan > 1 ? ` colspan="${mergedCell.columnSpan}"` : '';
-      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${escapeHtml(formatCellValue(row?.[columnIndex]))}</td>`;
-    }).join('');
+      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${renderCellContent(row?.[columnIndex])}</td>`;
+    }).filter(Boolean);
 
     const rowStyle = rowHeight ? ` style="height:${rowHeight}px"` : '';
-    return `<tr${rowStyle}><th class="row-number" style="${heightStyle}">${rowIndex + 1}</th>${cells}</tr>`;
-  }).join('');
+    const rowCells = [`<th class="row-number" style="${heightStyle}">${rowIndex + 1}</th>`, ...cells];
+    return [
+      `<tr${rowStyle}>`,
+      indentBlock(rowCells.join('\n'), 1),
+      '</tr>'
+    ].join('\n');
+  });
 
-  return `
-    <section>
-      <h2>${escapeHtml(name)}</h2>
-      <div class="table-scroll">
-        <table>
-          <colgroup><col class="row-number-column">${columns.map((_, index) => `<col style="width:${sheet.columnWidths?.[index + 1] || 100}px">`).join('')}</colgroup>
-          <thead><tr><th class="corner"></th>${columns.map(column => `<th>${column}</th>`).join('')}</tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    </section>`;
+  const columnTags = [
+    '<col class="row-number-column">',
+    ...columns.map((_, index) => `<col style="width:${sheet.columnWidths?.[index + 1] || 100}px">`)
+  ];
+  const headerCells = ['<th class="corner"></th>', ...columns.map(column => `<th>${column}</th>`)];
+
+  return [
+    '<section>',
+    `${INDENT}<h2>${escapeHtml(name)}</h2>`,
+    `${INDENT}<div class="table-scroll">`,
+    `${INDENT.repeat(2)}<table>`,
+    `${INDENT.repeat(3)}<colgroup>`,
+    indentBlock(columnTags.join('\n'), 4),
+    `${INDENT.repeat(3)}</colgroup>`,
+    `${INDENT.repeat(3)}<thead>`,
+    `${INDENT.repeat(4)}<tr>`,
+    indentBlock(headerCells.join('\n'), 5),
+    `${INDENT.repeat(4)}</tr>`,
+    `${INDENT.repeat(3)}</thead>`,
+    `${INDENT.repeat(3)}<tbody>`,
+    indentBlock(rows.join('\n'), 4),
+    `${INDENT.repeat(3)}</tbody>`,
+    `${INDENT.repeat(2)}</table>`,
+    `${INDENT}</div>`,
+    '</section>'
+  ].filter(line => line !== '').join('\n');
 }
 
 function renderSpreadsheetHtml(workbook, changes) {
   const sheets = Object.entries(workbook.sheets)
-    .map(([name, sheet]) => renderSheet(name, sheet, changes))
-    .join('');
+    .map(([name, sheet]) => indentBlock(renderSheet(name, sheet, changes), 2))
+    .join('\n');
 
   return `<!doctype html>
 <html lang="en">
@@ -120,7 +154,9 @@ function renderSpreadsheetHtml(workbook, changes) {
     <h1>Local Spreadsheet Preview</h1>
     <p>${changes.length} changes from the latest sync.</p>
   </header>
-  <main>${sheets}</main>
+  <main>
+${sheets}
+  </main>
 </body>
 </html>`;
 }

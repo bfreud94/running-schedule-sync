@@ -59,8 +59,7 @@ function parseSheetDate(value) {
     );
   }
 
-  const parsedDate = new Date(value);
-  return isNaN(parsedDate.getTime()) ? null : parsedDate;
+  return parseSheetDateText(value);
 }
 
 function findDateRowIndex(sheetData, activityDate) {
@@ -152,7 +151,7 @@ function formatInjuryReportCells(sheet, rowCount, lastHeaderColumnIndex) {
         .setVerticalAlignment('middle');
 
       if (isLocalInjuryReportEnvironment() && columnIndex === 0 && rowIndex > 0) {
-        cell.setNumberFormat('mmmm d');
+        cell.setNumberFormat('@');
       }
       if (columnIndex === 0) cell.setHorizontalAlignment('left');
       if (rowIndex === 0 || columnIndex === 0) cell.setFontWeight('bold');
@@ -186,7 +185,7 @@ function ensureInjuryReportWeek(sheet, sheetData, weekStart) {
     let rowIndex = sheetData.findIndex((row, index) => index >= 1 && !row[0]);
     if (rowIndex === -1) rowIndex = sheetData.length;
 
-    sheet.getRange(rowIndex + 1, 1).setValue(date).setNumberFormat('mmmm d');
+    sheet.getRange(rowIndex + 1, 1).setNumberFormat('@').setValue(formatSheetDateText(date));
     if (!sheetData[rowIndex]) sheetData[rowIndex] = [];
     sheetData[rowIndex][0] = date;
     existingDateKeys.add(dateKey);
@@ -215,9 +214,7 @@ function updateInjuryReportSheet(sheet, activities, weekStart, currentDate = new
     );
   }
   ensureInjuryReportWeek(sheet, sheetData, weekStart);
-  if (isLocalInjuryReportEnvironment()) {
-    normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
-  }
+  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
 
   const headers = [...sheetData[0]];
   const activitiesByDate = activities.filter(isRunningActivity).reduce((groups, activity) => {

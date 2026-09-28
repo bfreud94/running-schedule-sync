@@ -49,7 +49,9 @@ Strava activity descriptions are parsed for special sections:
   sheet. Exercises in the same category on the same day share a merged Date/Workout block, with a
   thin black divider row between different days. Weights mentioned in an exercise's parentheses
   (e.g. `70 lbs`) go in their own Weight column, one per line when a set uses multiple weights;
-  exercises with no weight get `N/A`.
+  exercises with no weight get `N/A`. A day's rows can be entered manually (e.g. a supplemental
+  workout on a non-running day); putting `Non Running Day` in that day's Notes column (case
+  insensitive, dashes/underscores allowed) makes the script leave those rows untouched.
 - **`Splits:`** followed by one split per line (e.g. `6:45` or `6:45 6:32`) — each line's first
   duration is the split time; a second duration, if present, is used as the pace, otherwise pace is
   calculated from the workout's parsed distance.
@@ -73,6 +75,8 @@ npm run local -- 2026-09-01 mocks # local mocks, since the supplied date
 npm run local -- pull 2026-09-01 # pull Strava, save mocks, then update spreadsheet.json
 npm run auth:google # authorize local read-only Google Sheets access once
 npm run update:planned # pull production Planned Schedule into fixtures/spreadsheet.json
+npm run update:supworkouts # pull production Supplemental Workouts into fixtures/spreadsheet.json
+npm run update:all   # pull both production tabs in a single pass
 npm run push         # git push, then clasp push to deploy to Apps Script
 ```
 
@@ -96,7 +100,10 @@ For local access to the private production spreadsheet:
 2. Save that file as `local/google-oauth-client.json`.
 3. Run `npm run auth:google` and authorize the requested read-only Sheets scope in the browser.
 4. Run `npm run update:planned` to update only `fixtures/spreadsheet.json`'s **Planned Schedule** tab.
-5. Run `npm run local:last-month` to sync the previous month using that planned data.
+5. Run `npm run update:supworkouts` to pull the **Supplemental Workouts** tab, which is how manually
+   entered rows (such as `Non Running Day` entries) propagate from production into local runs.
+6. Run `npm run update:all` to pull both tabs at once.
+7. Run `npm run local:last-month` to sync the previous month using that planned data.
 
 The client JSON and refresh token are ignored by git. Production does not use this OAuth flow; it
 continues reading the active spreadsheet through Apps Script's `SpreadsheetApp` authorization.

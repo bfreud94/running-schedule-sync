@@ -1,3 +1,3 @@
 const { runSpreadsheetTabSync } = require('./syncSpreadsheetTabs');
 
-runSpreadsheetTabSync(['Planned Schedule']);
+runSpreadsheetTabSync(['Supplemental Workouts']);

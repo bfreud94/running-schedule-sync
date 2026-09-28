@@ -44,6 +44,18 @@ function isBlankRow(row) {
   return !row || row.every(value => String(value || '').trim() === '');
 }
 
+// Manually-entered rest-day blocks opt out of all script rewrites via this note.
+function isNonRunningDayNote(value) {
+  return /non[\s\-_]*running[\s\-_]*day/i.test(String(value || ''));
+}
+
+function isNonRunningDayBlock(sheetData, block) {
+  for (let rowOffset = 0; rowOffset < block.rowCount; rowOffset++) {
+    if (isNonRunningDayNote(sheetData[block.startRowIndex + rowOffset]?.[6])) return true;
+  }
+  return false;
+}
+
 function getBlockGroups(sheetData, block) {
   const groups = [];
   let currentGroup = null;
@@ -105,6 +117,7 @@ function removeSupplementalWorkoutsBefore(sheet, sheetData, cutoffDate) {
   const cutoffKey = getDateKey(cutoffDate);
   const blocksToRemove = getAllDayBlocks(sheetData)
     .filter(block => {
+      if (isNonRunningDayBlock(sheetData, block)) return false;
       const blockDateKey = getBlockDateKey(sheetData, block);
       return blockDateKey && blockDateKey < cutoffKey;
     })
@@ -128,6 +141,9 @@ function sortDayBlocksIfNeeded(sheet, sheetData) {
   const blockDateKeys = blocks.map(block => getBlockDateKey(sheetData, block));
   const isAlreadySorted = blockDateKeys.every((dateKey, index) => index === 0 || blockDateKeys[index - 1] <= dateKey);
   if (isAlreadySorted) return;
+
+  // Re-sorting rewrites every block, which would reshape manually-entered rest-day rows.
+  if (blocks.some(block => isNonRunningDayBlock(sheetData, block))) return;
 
   const orderedBlocks = blocks
     .map(block => ({
@@ -156,10 +172,15 @@ function findAppendRowIndex(sheet, sheetData) {
 }
 
 function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group) {
+  // Re-sorts pass the existing cell value through, which may still be a legacy Date/ISO value.
+  const parsedDate = activityDate instanceof Date ? activityDate : parseSheetDateText(activityDate);
+  const dateText = parsedDate ? formatSheetDateText(parsedDate) : activityDate;
+
   group.exercises.forEach((exercise, exerciseIndex) => {
     const rowIndex = startRowIndex + exerciseIndex;
+    if (exerciseIndex === 0) sheet.getRange(rowIndex + 1, 1).setNumberFormat('@');
     sheet.getRange(rowIndex + 1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length).setValues([[
-      exerciseIndex === 0 ? activityDate : '',
+      exerciseIndex === 0 ? dateText : '',
       exerciseIndex === 0 ? group.category : '',
       exercise.workout,
       exercise.sets,
@@ -168,7 +189,6 @@ function writeSupplementalWorkoutGroup(sheet, startRowIndex, activityDate, group
       exercise.notes
     ]]);
     if (exerciseIndex === 0) {
-      sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
       sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
     }
   });
@@ -286,8 +306,8 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
   sheetData = ensureHeaderSeparator(sheet, sheetData);
+  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
   if (isLocalSupplementalWorkoutsEnvironment()) {
-    normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
     removeSupplementalWorkoutsBefore(sheet, sheet.getDataRange().getValues(), new Date(new Date().getFullYear(), 8, 15));
     sheetData = sheet.getDataRange().getValues();
   }
@@ -303,6 +323,8 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
     const existingBlock = findDayBlock(sheetData, dateKey);
     if (existingBlock) {
+      if (isNonRunningDayBlock(sheetData, existingBlock)) return;
+
       const existingSignature = buildDaySignature(dateKey, getBlockGroups(sheetData, existingBlock));
       if (existingSignature === daySignature) return;
 
@@ -351,7 +373,7 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
     contentRange.setFontFamily(null).setFontSize(null);
     for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
       if (sheetData[rowIndex]?.[0]) {
-        sheet.getRange(rowIndex + 1, 1).setNumberFormat('mmmm d');
+        sheet.getRange(rowIndex + 1, 1).setNumberFormat('@');
         sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
       }
     }
