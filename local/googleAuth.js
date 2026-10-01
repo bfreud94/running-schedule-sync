@@ -19,12 +19,23 @@ function loadClientConfig() {
   return config.installed || config.web || config;
 }
 
+const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1']);
+const LOOPBACK_PORT = '43821';
+
 function getRedirectUri(config) {
   const redirectUri = process.env.GOOGLE_OAUTH_REDIRECT_URI || config.redirect_uris?.[0];
   if (!redirectUri) {
     throw new Error(
-      'OAuth client has no redirect URI. Add http://localhost:43821/oauth2callback to Authorized redirect URIs in Google Cloud, or download a Desktop app OAuth client JSON.'
+      'OAuth client has no redirect URI. Download a Desktop app OAuth client JSON from Google Cloud and save it at local/google-oauth-client.json.'
     );
+  }
+  if (process.env.GOOGLE_OAUTH_REDIRECT_URI) return redirectUri;
+
+  // Desktop clients ignore the loopback port, so avoid binding privileged port 80.
+  const url = new URL(redirectUri);
+  if (LOOPBACK_HOSTS.has(url.hostname) && !url.port) {
+    url.port = LOOPBACK_PORT;
+    return url.toString();
   }
   return redirectUri;
 }

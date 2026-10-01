@@ -252,6 +252,13 @@ function ensureDaySeparatorRows(sheet, sheetData) {
   });
 }
 
+// Covers every blank row, including stray gaps that span more than one row between day blocks.
+function ensureAllSeparatorRowsPainted(sheet, sheetData) {
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    if (isBlankRow(sheetData[rowIndex])) writeSeparatorRow(sheet, rowIndex);
+  }
+}
+
 function ensureFinalSeparatorRow(sheet) {
   if (!sheet.getLastRow) return;
 
@@ -355,6 +362,7 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
   if (isLocalSupplementalWorkoutsEnvironment()) {
+    ensureAllSeparatorRowsPainted(sheet, sheetData);
     clearBlackFromWorkoutRows(sheet, sheetData);
     matchSupplementalFontToRowThree(sheet, sheetData);
   } else {

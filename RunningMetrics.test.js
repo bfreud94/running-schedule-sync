@@ -51,7 +51,7 @@ test('collects category names and exercise details from structured supplemental 
   assert.deepEqual(details.categories, ['Core', 'Upper Body']);
   assert.deepEqual(details.exercises, [
     { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '60 seconds', weight: 'N/A', notes: '' },
-    { category: 'Core', workout: 'Side planks', sets: '2', repsHoldTime: '60 seconds', weight: 'N/A', notes: 'each side' },
+    { category: 'Core', workout: 'Side planks', sets: '2', repsHoldTime: '60 seconds', weight: 'N/A', notes: 'Each side' },
     { category: 'Upper Body', workout: 'Bench Press', sets: '3', repsHoldTime: '10', weight: '70 lbs\n75 lbs\n80 lbs', notes: '' }
   ]);
 });
@@ -72,7 +72,7 @@ test('treats plain supplemental lines as categories for numbered exercises', () 
   assert.deepEqual(details.categories, ['Core']);
   assert.deepEqual(details.exercises, [
     { category: 'Core', workout: 'Planks', sets: '2', repsHoldTime: '1:30', weight: 'N/A', notes: '' },
-    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'each side' }
+    { category: 'Core', workout: 'Side Planks', sets: '2', repsHoldTime: '1:00', weight: 'N/A', notes: 'Each side' }
   ]);
 });
 
@@ -135,7 +135,7 @@ test('parses comma-separated sets with a single rep count and no weight', () => 
 
   assert.deepEqual(details.exercises, [
     { category: 'Legs', workout: 'Squats', sets: '3', repsHoldTime: '8', weight: 'N/A', notes: '' },
-    { category: 'Legs', workout: 'Copenhagen Planks', sets: '3', repsHoldTime: '8', weight: 'N/A', notes: 'both sides' }
+    { category: 'Legs', workout: 'Copenhagen Planks', sets: '3', repsHoldTime: '8', weight: 'N/A', notes: 'Both sides' }
   ]);
 });
 

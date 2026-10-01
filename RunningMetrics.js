@@ -34,6 +34,10 @@ function isWeightDetail(detail) {
   return /\d+(?:\.\d+)?\s*(?:lbs?|pounds?|kgs?|kilograms?)\b/i.test(detail) || /^bodyweight$/i.test(detail);
 }
 
+function capitalizeFirstLetter(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
 function parseSupplementalExerciseLine(line, category) {
   const match = String(line || '').trim().match(/^\d+\.\s*([^()]+?)(?:\s*\(([^)]*)\))?\s*$/);
   if (!match) return null;
@@ -71,7 +75,7 @@ function parseSupplementalExerciseLine(line, category) {
       sets: structuredSetsMatch[1],
       repsHoldTime: reps.length ? reps.join('\n') : '',
       weight: weights.length ? weights.join('\n') : 'N/A',
-      notes: notes.join(', ')
+      notes: capitalizeFirstLetter(notes.join(', '))
     };
   }
 
@@ -92,7 +96,7 @@ function parseSupplementalExerciseLine(line, category) {
     sets: setsAndRepsMatch ? setsAndRepsMatch[1] : '',
     repsHoldTime,
     weight: weightParts.length ? weightParts.join('\n') : 'N/A',
-    notes: noteParts.join(', ')
+    notes: capitalizeFirstLetter(noteParts.join(', '))
   };
 }
 

@@ -124,6 +124,34 @@ test('adds a separator after the final day block when it is missing', () => {
   ]);
 });
 
+test('paints every blank row black, including stray gaps spanning more than one row', () => {
+  const writes = [];
+  const sheet = {
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); return this; }
+      };
+    },
+    setRowHeight: (row, height) => { writes.push({ row, height }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.paintTarget = ensureAllSeparatorRowsPainted;', context);
+
+  context.paintTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    [],
+    ['2026-09-15', 'Core', 'Planks', '1', '1:00', 'N/A', '']
+  ]);
+
+  assert.deepEqual(writes, [
+    { row: 2, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 2, height: 10 },
+    { row: 3, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 3, height: 10 }
+  ]);
+});
+
 test('inserts the final separator row when its formatting is outside the data range', () => {
   const writes = [];
   const sheet = {
