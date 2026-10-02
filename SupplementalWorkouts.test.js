@@ -124,20 +124,21 @@ test('adds a separator after the final day block when it is missing', () => {
   ]);
 });
 
-test('paints every blank row black, including stray gaps spanning more than one row', () => {
+test('does not paint a stray extra blank row that falls before the first day block', () => {
   const writes = [];
   const sheet = {
     getRange(row, column, numRows = 1, numColumns = 1) {
       return {
+        getBackground: () => '#ffffff',
         setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); return this; }
       };
     },
     setRowHeight: (row, height) => { writes.push({ row, height }); }
   };
   const context = loadContext();
-  vm.runInContext('globalThis.paintTarget = ensureAllSeparatorRowsPainted;', context);
+  vm.runInContext('globalThis.separatorTarget = ensureDaySeparatorRows;', context);
 
-  context.paintTarget(sheet, [
+  context.separatorTarget(sheet, [
     ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
     [],
     [],
@@ -145,11 +146,108 @@ test('paints every blank row black, including stray gaps spanning more than one 
   ]);
 
   assert.deepEqual(writes, [
-    { row: 2, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
-    { row: 2, height: 10 },
-    { row: 3, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
-    { row: 3, height: 10 }
+    { row: 5, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 5, height: 10 }
   ]);
+});
+
+test('clears a stray black row left over from a prior bug, leaving real separators alone', () => {
+  const backgrounds = { '3,1': '#000000', '5,1': '#000000' };
+  const writes = [];
+  const sheet = {
+    getRange(row, column, numRows = 1, numColumns = 1) {
+      return {
+        getBackground: () => backgrounds[`${row},${column}`] || '#ffffff',
+        setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); return this; }
+      };
+    }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.clearStrayTarget = clearUnexpectedSeparatorRows;', context);
+
+  context.clearStrayTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    [],
+    ['2026-09-15', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+    []
+  ]);
+
+  assert.deepEqual(writes, [
+    { row: 3, column: 1, numRows: 1, numColumns: 7, value: null }
+  ]);
+});
+
+test('reuses an existing blank header separator row instead of inserting a duplicate', () => {
+  const inserted = [];
+  const sheet = {
+    insertRows: (row, count) => { inserted.push({ row, count }); },
+    getRange: () => ({ setBackground: () => {} }),
+    setRowHeight: () => {},
+    getDataRange: () => ({ getValues: () => [['Date', 'Workout'], []] })
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.headerSeparatorTarget = ensureHeaderSeparator;', context);
+
+  context.headerSeparatorTarget(sheet, [['Date', 'Workout'], []]);
+
+  assert.deepEqual(inserted, []);
+});
+
+test('inserts a header separator row when row 2 already holds real data', () => {
+  const inserted = [];
+  const sheet = {
+    insertRows: (row, count) => { inserted.push({ row, count }); },
+    getRange: () => ({ setBackground: () => {} }),
+    setRowHeight: () => {},
+    getDataRange: () => ({ getValues: () => [['Date', 'Workout'], ['2026-09-15', 'Core']] })
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.headerSeparatorTarget = ensureHeaderSeparator;', context);
+
+  context.headerSeparatorTarget(sheet, [['Date', 'Workout'], ['2026-09-15', 'Core']]);
+
+  assert.deepEqual(inserted, [{ row: 2, count: 1 }]);
+});
+
+test('does not insert a duplicate final separator row when it already exists blank but unpainted', () => {
+  const writes = [];
+  const sheet = {
+    getLastRow: () => 3,
+    getDataRange: () => ({ getValues: () => [['Date', 'Workout'], ['2026-09-15', 'Core'], ['', ''], []] }),
+    getRange: (row, column, numRows = 1, numColumns = 1) => ({
+      setBackground: value => { writes.push({ row, column, numRows, numColumns, value }); }
+    }),
+    insertRows: (row, count) => { writes.push({ row, count }); },
+    setRowHeight: (row, height) => { writes.push({ row, height }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.finalSeparatorTarget = ensureFinalSeparatorRow;', context);
+
+  context.finalSeparatorTarget(sheet);
+
+  assert.deepEqual(writes, [
+    { row: 4, column: 1, numRows: 1, numColumns: 7, value: '#000000' },
+    { row: 4, height: 10 }
+  ]);
+});
+
+test('removes a duplicated blank row, collapsing consecutive blanks down to one', () => {
+  const deletions = [];
+  const sheet = {
+    deleteRows: (row, count) => { deletions.push({ row, count }); }
+  };
+  const context = loadContext();
+  vm.runInContext('globalThis.removeBlanksTarget = removeConsecutiveBlankRows;', context);
+
+  context.removeBlanksTarget(sheet, [
+    ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+    [],
+    [],
+    ['2026-09-15', 'Core', 'Planks', '1', '1:00', 'N/A', '']
+  ]);
+
+  assert.deepEqual(deletions, [{ row: 3, count: 1 }]);
 });
 
 test('inserts the final separator row when its formatting is outside the data range', () => {

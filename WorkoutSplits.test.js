@@ -29,6 +29,23 @@ test('parses workout splits until the first blank line and calculates mile pace'
   assert.equal(context.splitsTarget('Workout:\nEasy run\nNo Splits section', 'Easy run').length, 0);
 });
 
+test('uses the distance value in column C when a split is recorded by distance instead of time', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('WorkoutSplits.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.splitsTarget = parseWorkoutSplits;`, context);
+
+  const splits = context.splitsTarget(
+    'Workout:\n6 minute Interval\nSplits:\n1: 0.81 miles (7:26 pace)\n2: 0.81 miles (7:26 pace)',
+    '6 minute Interval'
+  );
+
+  assert.equal(splits[0].value, '0.81 miles');
+  assert.equal(splits[0].pace, '7:26');
+  assert.equal(splits[1].value, '0.81 miles');
+  assert.equal(splits[1].pace, '7:26');
+});
+
 test('falls back to the split value when no pace is available', () => {
   const context = vm.createContext({ console });
   const source = readFileSync('WorkoutSplits.js', 'utf8');

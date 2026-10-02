@@ -1,8 +1,10 @@
 const { readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const { google } = require('googleapis');
 const { getAuthenticatedClient } = require('./googleAuth');
 const { renderSpreadsheetHtml } = require('./SpreadsheetHtml');
+const { createSpreadsheetApp } = require('./GoogleSheetsMock');
 
 const ROOT = path.resolve(__dirname, '..');
 const SPREADSHEET_NAME = '2026 Running Schedule';
@@ -55,6 +57,25 @@ async function readSpreadsheetTab(sheets, tabName) {
   return response.data.values || [];
 }
 
+// Pulled values carry no formatting, so repaint black separator rows using the real
+// generator logic instead of leaving Supplemental Workouts looking broken locally.
+function repaintSupplementalWorkoutsSeparators(workbook) {
+  const sheet = workbook.sheets?.['Supplemental Workouts'];
+  if (!sheet) return;
+
+  const { SpreadsheetApp } = createSpreadsheetApp(workbook);
+  const source = [
+    readFileSync(path.join(ROOT, 'DateUtils.js'), 'utf8'),
+    readFileSync(path.join(ROOT, 'InjuryReport.js'), 'utf8'),
+    readFileSync(path.join(ROOT, 'SupplementalWorkouts.js'), 'utf8')
+  ].join('\n');
+  const context = vm.createContext({ console, SpreadsheetApp });
+  vm.runInContext(
+    `${source}\nrepairSupplementalWorkoutsSeparators(SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME));`,
+    context
+  );
+}
+
 async function syncSpreadsheetTabs(tabNames) {
   const auth = await getAuthenticatedClient();
   const sheets = google.sheets({ version: 'v4', auth });
@@ -79,6 +100,7 @@ async function syncSpreadsheetTabs(tabNames) {
 
   applyLocalBoldFormatting(workbook);
   applyLocalDateFormatting(workbook);
+  if (tabNames.includes('Supplemental Workouts')) repaintSupplementalWorkoutsSeparators(workbook);
 
   const serializedWorkbook = `${JSON.stringify(workbook, null, 2)}\n`;
   writeFileSync(fixturePath, serializedWorkbook);

@@ -208,11 +208,12 @@ function writeSeparatorRow(sheet, rowIndex) {
   sheet.setRowHeight(rowIndex + 1, SUPPLEMENTAL_WORKOUTS_SEPARATOR_HEIGHT);
 }
 
+// Row existence/content (not paint color) decides whether a row needs inserting: a blank row that
+// lost its black background (e.g. from an external style wipe) is still a valid separator slot.
 function ensureHeaderSeparator(sheet, sheetData) {
   const separatorRowIndex = 1;
-  const isSeparator = sheet.getRange(separatorRowIndex + 1, 1).getBackground()
-    === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
-  if (!isSeparator) {
+  const rowIsMissingOrOccupied = sheetData.length <= separatorRowIndex || !isBlankRow(sheetData[separatorRowIndex]);
+  if (rowIsMissingOrOccupied) {
     sheet.insertRows(separatorRowIndex + 1, 1);
   }
 
@@ -252,10 +253,28 @@ function ensureDaySeparatorRows(sheet, sheetData) {
   });
 }
 
-// Covers every blank row, including stray gaps that span more than one row between day blocks.
-function ensureAllSeparatorRowsPainted(sheet, sheetData) {
+// Collapses already-duplicated blank rows left over from the ensureHeaderSeparator/
+// ensureFinalSeparatorRow bug above, keeping just one blank row per gap.
+function removeConsecutiveBlankRows(sheet, sheetData) {
+  for (let rowIndex = sheetData.length - 1; rowIndex >= 2; rowIndex--) {
+    if (isBlankRow(sheetData[rowIndex]) && isBlankRow(sheetData[rowIndex - 1])) {
+      sheet.deleteRows(rowIndex + 1, 1);
+    }
+  }
+}
+
+// Undoes stray black rows left over from prior bugs (e.g. a blank row before the first day block).
+function clearUnexpectedSeparatorRows(sheet, sheetData) {
+  const expectedSeparatorRowIndexes = new Set([1, sheetData.length]);
+  getAllDayBlocks(sheetData).forEach(block => {
+    expectedSeparatorRowIndexes.add(block.startRowIndex + block.rowCount);
+  });
+
   for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
-    if (isBlankRow(sheetData[rowIndex])) writeSeparatorRow(sheet, rowIndex);
+    if (!isBlankRow(sheetData[rowIndex]) || expectedSeparatorRowIndexes.has(rowIndex)) continue;
+    const isPainted = sheet.getRange(rowIndex + 1, 1).getBackground() === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+    if (!isPainted) continue;
+    sheet.getRange(rowIndex + 1, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length).setBackground(null);
   }
 }
 
@@ -264,11 +283,11 @@ function ensureFinalSeparatorRow(sheet) {
 
   const lastRow = sheet.getLastRow();
   const separatorRow = lastRow + 1;
-  const alreadyPainted = sheet.getRange(separatorRow, 1).getBackground()
-    === SUPPLEMENTAL_WORKOUTS_SEPARATOR_BACKGROUND;
+  const currentValues = sheet.getDataRange().getValues();
+  const rowHasContent = currentValues.length >= separatorRow && !isBlankRow(currentValues[separatorRow - 1]);
   const localSeparatorIsMissing = isLocalSupplementalWorkoutsEnvironment()
-    && sheet.getDataRange().getValues().length < separatorRow;
-  if ((!alreadyPainted || localSeparatorIsMissing) && sheet.insertRows) {
+    && currentValues.length < separatorRow;
+  if ((rowHasContent || localSeparatorIsMissing) && sheet.insertRows) {
     sheet.insertRows(separatorRow, 1);
   }
 
@@ -306,6 +325,18 @@ function matchSupplementalFontToRowThree(sheet, sheetData) {
   const range = sheet.getRange(1, 1, sheetData.length, SUPPLEMENTAL_WORKOUTS_HEADERS.length);
   if (fontFamily !== undefined) range.setFontFamily(fontFamily);
   if (fontSize !== undefined) range.setFontSize(fontSize);
+}
+
+// Re-paints separators/fonts for the local view; shared by the main sync and by tools that pull
+// raw values from production (which carry no formatting of their own).
+function repaintLocalSupplementalWorkoutsSeparators(sheet, sheetData) {
+  removeConsecutiveBlankRows(sheet, sheetData);
+  sheetData = sheet.getDataRange().getValues();
+  ensureDaySeparatorRows(sheet, sheetData);
+  clearUnexpectedSeparatorRows(sheet, sheetData);
+  clearBlackFromWorkoutRows(sheet, sheetData);
+  matchSupplementalFontToRowThree(sheet, sheetData);
+  return sheet.getDataRange().getValues();
 }
 
 function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
@@ -362,9 +393,7 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sortDayBlocksIfNeeded(sheet, sheetData);
   sheetData = sheet.getDataRange().getValues();
   if (isLocalSupplementalWorkoutsEnvironment()) {
-    ensureAllSeparatorRowsPainted(sheet, sheetData);
-    clearBlackFromWorkoutRows(sheet, sheetData);
-    matchSupplementalFontToRowThree(sheet, sheetData);
+    sheetData = repaintLocalSupplementalWorkoutsSeparators(sheet, sheetData);
   } else {
     ensureDaySeparatorRows(sheet, sheetData);
     ensureFinalSeparatorRow(sheet);
@@ -400,4 +429,18 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sheet.setColumnWidth(6, 150);
   sheet.setColumnWidth(7, 220);
   if (isLocalSupplementalWorkoutsEnvironment()) ensureFinalSeparatorRow(sheet);
+}
+
+// Reapplies separator formatting to a sheet whose values came from elsewhere (e.g. pulled
+// straight from production), without touching data or pruning old rows.
+function repairSupplementalWorkoutsSeparators(sheet) {
+  let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
+  sheetData = ensureHeaderSeparator(sheet, sheetData);
+  normalizeSheetDateColumn(sheet, sheet.getDataRange().getValues());
+  sheetData = sheet.getDataRange().getValues();
+
+  sortDayBlocksIfNeeded(sheet, sheetData);
+  sheetData = sheet.getDataRange().getValues();
+  repaintLocalSupplementalWorkoutsSeparators(sheet, sheetData);
+  ensureFinalSeparatorRow(sheet);
 }

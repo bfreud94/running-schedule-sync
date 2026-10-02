@@ -50,20 +50,36 @@ function formatSplitPace(seconds) {
   return `${Math.floor(roundedSeconds / 60)}:${String(roundedSeconds % 60).padStart(2, '0')}`;
 }
 
-function parseSplitLine(line, distanceMiles) {
-  const durations = String(line).match(/\d+:[0-5]\d(?:\.\d+)?/g) || [];
-  if (durations.length === 0) return { value: line, pace: '' };
+function extractParenthesizedPace(line) {
+  const match = String(line).match(/\((\d+:[0-5]\d(?:\.\d+)?)\s*pace\)/i);
+  return match ? match[1] : '';
+}
 
-  const split = durations[0];
-  const splitSeconds = parseSplitSeconds(split);
-  const explicitPace = durations[1] || '';
-  const calculatedPace = distanceMiles && splitSeconds !== null
-    ? formatSplitPace(splitSeconds / distanceMiles)
-    : '';
-  return {
-    value: split,
-    pace: explicitPace || calculatedPace || split
-  };
+function parseSplitLine(line, distanceMiles) {
+  const text = String(line);
+  const parenPace = extractParenthesizedPace(text);
+  // Strip the "(X:XX pace)" suffix first so a distance-only split isn't mistaken for its own pace.
+  const timeSearchText = parenPace ? text.replace(/\([^)]*pace\)/i, '') : text;
+  const durations = timeSearchText.match(/\d+:[0-5]\d(?:\.\d+)?/g) || [];
+
+  if (durations.length > 0) {
+    const split = durations[0];
+    const splitSeconds = parseSplitSeconds(split);
+    const explicitPace = durations[1] || parenPace;
+    const calculatedPace = distanceMiles && splitSeconds !== null
+      ? formatSplitPace(splitSeconds / distanceMiles)
+      : '';
+    return {
+      value: split,
+      pace: explicitPace || calculatedPace || split
+    };
+  }
+
+  // Splits are sometimes recorded by distance rather than time (e.g. "0.81 miles (7:26 pace)").
+  const distanceMatch = text.match(/\d+(?:\.\d+)?\s*(?:mi|miles?|km|kilometers?|m|meters?)\b/i);
+  if (distanceMatch) return { value: distanceMatch[0].trim(), pace: parenPace };
+
+  return { value: line, pace: '' };
 }
 
 function parseWorkoutSplits(description, workout) {

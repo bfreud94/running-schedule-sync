@@ -9,10 +9,7 @@ function reviveDates(key, value) {
   return typeof value === 'string' && ISO_DATE_TIME_PATTERN.test(value) ? new Date(value) : value;
 }
 
-function createGoogleSheetsMock(fixturePath, outputPath) {
-  const workbook = JSON.parse(readFileSync(fixturePath, 'utf8'), reviveDates);
-  const changes = [];
-
+function createSpreadsheetApp(workbook, changes = []) {
   function getSheet(name) {
     const sheet = workbook.sheets[name];
     if (!sheet) return null;
@@ -280,6 +277,16 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
       }),
       flush: recalculateTotals
     },
+    changes
+  };
+}
+
+function createGoogleSheetsMock(fixturePath, outputPath) {
+  const workbook = JSON.parse(readFileSync(fixturePath, 'utf8'), reviveDates);
+  const { SpreadsheetApp, changes } = createSpreadsheetApp(workbook);
+
+  return {
+    SpreadsheetApp,
     save() {
       mkdirSync(path.dirname(outputPath), { recursive: true });
       writeFileSync(outputPath, `${JSON.stringify({ ...workbook, changes }, null, 2)}\n`);
@@ -290,4 +297,4 @@ function createGoogleSheetsMock(fixturePath, outputPath) {
   };
 }
 
-module.exports = { createGoogleSheetsMock };
+module.exports = { createGoogleSheetsMock, createSpreadsheetApp };
