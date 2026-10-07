@@ -10,6 +10,10 @@ function ensureRunsHeader(sheet) {
   const firstRow = sheet.getDataRange().getValues()[0] || [];
   const hasHeader = RUNS_HEADERS.every((header, index) => String(firstRow[index] || '') === header);
   if (hasHeader) {
+    const headerCell = sheet.getRange(1, 1);
+    // Already-formatted header: skip reapplying so every local run doesn't rewrite this range.
+    if (headerCell.getFontWeight && headerCell.getFontWeight() === 'bold' && headerCell.getBackground() === '#ffffff') return;
+
     sheet.getRange(1, 1, 1, RUNS_HEADERS.length)
       .setBackground(null)
       .setFontColor('#202124')
@@ -27,9 +31,11 @@ function ensureRunsHeader(sheet) {
 function boldActualRunLabels(sheet) {
   const rows = sheet.getDataRange().getValues();
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-    if (String(rows[rowIndex][0] || '').trim().toUpperCase().startsWith('WEEK ')) {
-      sheet.getRange(rowIndex + 1, 1).setFontWeight('bold');
-    }
+    if (!String(rows[rowIndex][0] || '').trim().toUpperCase().startsWith('WEEK ')) continue;
+    const labelCell = sheet.getRange(rowIndex + 1, 1);
+    // Skip already-bold rows so every local run doesn't rewrite every prior week's label.
+    if (labelCell.getFontWeight && labelCell.getFontWeight() === 'bold') continue;
+    labelCell.setFontWeight('bold');
   }
 }
 
@@ -108,16 +114,18 @@ function applyCellStyle(cell, style) {
   cell.setFontColor(style.fontColor);
 }
 
-function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts = []) {
+function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts = [], forceDayIndex = todayOffset) {
+  const updatedDayIndexes = [];
   for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const existingValue = String(targetCell.getValue() || '').replace(/\u00A0/g, ' ').trim();
     const isRest = isRestValue(existingValue);
     const workoutText = [...dailyWorkouts[dayIndex], ...(dailySupplementalWorkouts[dayIndex] || [])].join('\n');
     const needsWorkoutBackfill = workoutText && !existingValue.includes(workoutText);
-    const canUpdate = dayIndex === todayOffset || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [') || needsWorkoutBackfill;
+    const canUpdate = dayIndex === forceDayIndex || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [') || needsWorkoutBackfill;
 
     if (!canUpdate) continue;
+    updatedDayIndexes.push(dayIndex);
 
     const stravaMiles = Math.floor(dailyMiles[dayIndex] * 100) / 100;
     const milesText = stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`;
@@ -128,16 +136,17 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
       applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], stravaMiles));
     }
   }
+  return updatedDayIndexes;
 }
 
-function applyDailyCellStyles(actualSheet, rowIndex, plannedRow, todayOffset) {
+function applyDailyCellStyles(actualSheet, rowIndex, plannedRow, todayOffset, dayIndexes = Array.from({ length: todayOffset + 1 }, (_, index) => index)) {
   if (!plannedRow) return;
 
-  for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
+  dayIndexes.forEach(dayIndex => {
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const actualMiles = parseMilesFromCell(targetCell.getValue());
     applyCellStyle(targetCell, getDailyCellStyle(plannedRow[dayIndex + 1], actualMiles));
-  }
+  });
 }
 
 function updateTotalCell(actualSheet, rowIndex, plannedRow) {

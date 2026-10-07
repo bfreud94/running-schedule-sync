@@ -101,6 +101,7 @@ function createSpreadsheetApp(workbook, changes = []) {
         return {
           getValue: () => sheet.values[rowIndex]?.[columnIndex],
           getBackground: () => sheet.styles[`${row},${column}`]?.background || '#ffffff',
+          getFontWeight: () => sheet.styles[`${row},${column}`]?.fontWeight || 'normal',
           getFontFamily: () => sheet.styles[`${row},${column}`]?.fontFamily || 'Aptos',
           getFontSize: () => sheet.styles[`${row},${column}`]?.fontSize || 13,
           setValue(value) {

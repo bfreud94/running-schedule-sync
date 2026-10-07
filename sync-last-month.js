@@ -149,17 +149,21 @@ function syncLastMonth() {
     const todayOffset = targetMonday < currentMonday
       ? 6
       : Math.min(6, Math.max(0, getDayOffset(currentDate, targetMonday)));
+    // Only the literal current week should force-refresh/recolor "today" - past weeks are
+    // already fully elapsed, so a day equal to todayOffset there is finalized, not "in progress".
+    const isCurrentWeek = areSameDate(targetMonday, currentMonday);
 
-    updateDailyCells(
+    const updatedDayIndexes = updateDailyCells(
       actualSheet,
       targetRowIndex,
       plannedRow,
       calculateDailyRunMiles(weekActivities, targetMonday),
       calculateDailyWorkouts(weekActivities, targetMonday),
       todayOffset,
-      calculateDailySupplementalWorkouts(weekActivities, targetMonday)
+      calculateDailySupplementalWorkouts(weekActivities, targetMonday),
+      isCurrentWeek ? todayOffset : -1
     );
-    applyDailyCellStyles(actualSheet, targetRowIndex, plannedRow, todayOffset);
+    applyDailyCellStyles(actualSheet, targetRowIndex, plannedRow, todayOffset, isCurrentWeek ? undefined : updatedDayIndexes);
     updateInjuryReportSheet(injuryReportSheet, weekActivities, targetMonday, currentDate);
     SpreadsheetApp.flush();
     updateTotalCell(actualSheet, targetRowIndex, plannedRow);
