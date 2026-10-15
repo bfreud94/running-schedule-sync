@@ -38,7 +38,17 @@ function syncStravaToActualRuns() {
   updateDailyCells(actualSheet, targetRowIndex, plannedRow, dailyMiles, dailyWorkouts, todayOffset, dailySupplementalWorkouts);
   applyDailyCellStyles(actualSheet, targetRowIndex, plannedRow, todayOffset);
   updateWorkoutSplitsSheet(spreadsheet, activities);
-  updateSupplementalWorkoutsSheet(spreadsheet, activities);
+  // Derived after the daily cells are written: a day left as "Rest" had no Strava run, so any
+  // Supplemental Workouts rows on that date must have been entered by hand.
+  const manualDateKeys = getManualEntryDateKeys(actualSheet, targetRowIndex, targetMonday, todayOffset);
+  updateSupplementalWorkoutsSheet(spreadsheet, activities, {
+    manualDateKeys,
+    earliestEditableDateKey: getDateKey(targetMonday)
+  });
+  const supplementalDayIndexes = applySupplementalWorkoutsToActualRuns(spreadsheet, actualSheet, targetRowIndex, targetMonday, todayOffset);
+  if (supplementalDayIndexes.length > 0) {
+    applyDailyCellStyles(actualSheet, targetRowIndex, plannedRow, todayOffset, supplementalDayIndexes);
+  }
   updateInjuryReportSheet(injuryReportSheet, activities, targetMonday, new Date());
 
   SpreadsheetApp.flush();

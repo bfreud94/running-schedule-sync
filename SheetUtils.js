@@ -89,6 +89,28 @@ function isRestValue(value) {
   return /(^|\n)rest($|\n)/i.test(String(value || '').trim());
 }
 
+function splitCellLines(value) {
+  return String(value || '')
+    .replace(/\u00A0/g, ' ')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line !== '');
+}
+
+// Adds only the lines a cell is missing, so repeated syncs never stack duplicate workout names.
+function appendMissingCellLines(existingValue, additionalLines) {
+  const lines = splitCellLines(existingValue);
+
+  additionalLines.forEach(additionalLine => {
+    const text = String(additionalLine || '').trim();
+    if (!text) return;
+    if (lines.some(line => line.toLowerCase() === text.toLowerCase())) return;
+    lines.push(text);
+  });
+
+  return lines.join('\n');
+}
+
 function getDailyCellStyle(plannedValue, actualMiles) {
   if (isRestValue(plannedValue)) {
     return actualMiles === 0
@@ -120,7 +142,8 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
     const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
     const existingValue = String(targetCell.getValue() || '').replace(/\u00A0/g, ' ').trim();
     const isRest = isRestValue(existingValue);
-    const workoutText = [...dailyWorkouts[dayIndex], ...(dailySupplementalWorkouts[dayIndex] || [])].join('\n');
+    const workoutLines = [...dailyWorkouts[dayIndex], ...(dailySupplementalWorkouts[dayIndex] || [])];
+    const workoutText = workoutLines.join('\n');
     const needsWorkoutBackfill = workoutText && !existingValue.includes(workoutText);
     const canUpdate = dayIndex === forceDayIndex || existingValue === '' || isRest || existingValue.toLowerCase().startsWith('data [') || needsWorkoutBackfill;
 
@@ -129,7 +152,7 @@ function updateDailyCells(actualSheet, rowIndex, plannedRow, dailyMiles, dailyWo
 
     const stravaMiles = Math.floor(dailyMiles[dayIndex] * 100) / 100;
     const milesText = stravaMiles === 0 ? (isRest ? existingValue : 'Rest') : `${stravaMiles} miles`;
-    targetCell.setValue(workoutText ? `${milesText}\n${workoutText}` : milesText);
+    targetCell.setValue(appendMissingCellLines(milesText, workoutLines));
     if (targetCell.setFontWeight) targetCell.setFontWeight('normal');
 
     if (plannedRow) {

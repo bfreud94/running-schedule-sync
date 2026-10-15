@@ -13,5 +13,8 @@
   },
   "dependencies": {
     "googleapis": "^144.0.0"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.4.1"
   }
 }

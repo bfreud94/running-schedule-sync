@@ -136,34 +136,107 @@ function findChronologicalInsertionRowIndex(sheetData, dateKey) {
   return nextBlock ? nextBlock.startRowIndex : null;
 }
 
-function sortDayBlocksIfNeeded(sheet, sheetData) {
-  const blocks = getAllDayBlocks(sheetData);
-  const blockDateKeys = blocks.map(block => getBlockDateKey(sheetData, block));
-  const isAlreadySorted = blockDateKeys.every((dateKey, index) => index === 0 || blockDateKeys[index - 1] <= dateKey);
-  if (isAlreadySorted) return;
+// A day with no Strava run shows as "Rest" (or is still blank) in Actual Runs. Supplemental rows
+// existing for such a day were therefore entered by hand, which is the only way to tell a manual
+// entry apart from a generated one — the sheet itself carries no manual/automatic marker.
+function getManualEntryDateKeys(actualSheet, rowIndex, targetMonday, todayOffset) {
+  const manualDateKeys = {};
+  const weekDates = getWeekDates(targetMonday);
 
-  // Re-sorting rewrites every block, which would reshape manually-entered rest-day rows.
-  if (blocks.some(block => isNonRunningDayBlock(sheetData, block))) return;
+  for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
+    const cellValue = actualSheet.getRange(rowIndex + 1, dayIndex + 2).getValue();
+    const hasNoRun = isRestValue(cellValue) || splitCellLines(cellValue).length === 0;
+    if (hasNoRun) manualDateKeys[getDateKey(weekDates[dayIndex])] = true;
+  }
 
-  const orderedBlocks = blocks
-    .map(block => ({
-      activityDate: sheetData[block.startRowIndex][0],
-      dateKey: getBlockDateKey(sheetData, block),
-      groups: getBlockGroups(sheetData, block)
-    }))
-    .sort((left, right) => (left.dateKey < right.dateKey ? -1 : left.dateKey > right.dateKey ? 1 : 0));
+  return manualDateKeys;
+}
 
-  const firstBlockRowIndex = Math.min(...blocks.map(block => block.startRowIndex));
-  sheet.deleteRows(firstBlockRowIndex + 1, sheetData.length - firstBlockRowIndex);
+// Re-sorting must never reshape rows it did not generate, so a relocated block is carried over
+// verbatim (all seven columns) instead of being rebuilt from its parsed groups.
+function getBlockRawRows(sheetData, block) {
+  const rawRows = [];
+  for (let rowOffset = 0; rowOffset < block.rowCount; rowOffset++) {
+    const row = sheetData[block.startRowIndex + rowOffset] || [];
+    rawRows.push(SUPPLEMENTAL_WORKOUTS_HEADERS.map((_, columnIndex) => (
+      row[columnIndex] === null || row[columnIndex] === undefined ? '' : row[columnIndex]
+    )));
+  }
+  return rawRows;
+}
 
-  let rowIndex = firstBlockRowIndex;
-  orderedBlocks.forEach(({ activityDate, groups }) => {
-    groups.forEach(group => {
-      rowIndex = writeSupplementalWorkoutGroup(sheet, rowIndex, activityDate, group);
-    });
-    writeSeparatorRow(sheet, rowIndex);
-    rowIndex++;
+function writeRawBlockRows(sheet, startRowIndex, rawRows) {
+  rawRows.forEach((rawRow, rowOffset) => {
+    const rowNumber = startRowIndex + rowOffset + 1;
+    // Only the Date cell is normalized to the sheet's "Month Day" text; every other column moves
+    // across exactly as the user left it.
+    const blockDate = parseSheetDate(rawRow[0]);
+    const values = rawRow.slice();
+    if (blockDate) values[0] = formatSheetDateText(blockDate);
+
+    if (String(values[0] || '').trim()) {
+      sheet.getRange(rowNumber, 1).setNumberFormat('@');
+    }
+    sheet.getRange(rowNumber, 1, 1, SUPPLEMENTAL_WORKOUTS_HEADERS.length).setValues([values]);
+    if (String(values[0] || '').trim()) {
+      sheet.getRange(rowNumber, 1).setFontWeight('bold');
+    }
   });
+
+  // Each category span (a row with a Workout value plus the blank continuation rows under it)
+  // regains the merged Date/Workout cells the block had before it moved.
+  let spanStart = 0;
+  for (let rowOffset = 1; rowOffset <= rawRows.length; rowOffset++) {
+    const startsNewSpan = rowOffset === rawRows.length || String(rawRows[rowOffset][1] || '').trim() !== '';
+    if (!startsNewSpan) continue;
+
+    const spanLength = rowOffset - spanStart;
+    if (spanLength > 1) {
+      for (let columnIndex = 1; columnIndex <= 2; columnIndex++) {
+        sheet.getRange(startRowIndex + spanStart + 1, columnIndex, spanLength, 1)
+          .merge()
+          .setVerticalAlignment('top');
+      }
+    }
+    spanStart = rowOffset;
+  }
+}
+
+// Moves only the blocks that sit in the wrong place, and only within the window the script is
+// allowed to touch. Blocks already in order — and the entire log before the window — keep their
+// existing rows, formatting, and merges untouched.
+function sortDayBlocksIfNeeded(sheet, sheetData, earliestEditableDateKey = null) {
+  const movedDateKeys = {};
+
+  for (let pass = 0; pass < 100; pass++) {
+    const blocks = getAllDayBlocks(sheetData);
+    const blockDateKeys = blocks.map(block => getBlockDateKey(sheetData, block));
+
+    // A block whose date cannot be read has no defined position, so ordering is left alone.
+    if (blockDateKeys.some(dateKey => !dateKey)) return;
+
+    const misplacedIndex = blockDateKeys.findIndex((dateKey, index) => {
+      if (index === 0 || dateKey >= blockDateKeys[index - 1]) return false;
+      if (earliestEditableDateKey && dateKey < earliestEditableDateKey) return false;
+      return !movedDateKeys[dateKey];
+    });
+    if (misplacedIndex === -1) return;
+
+    const block = blocks[misplacedIndex];
+    const dateKey = blockDateKeys[misplacedIndex];
+    const rawRows = getBlockRawRows(sheetData, block);
+    movedDateKeys[dateKey] = true;
+
+    sheet.deleteRows(block.startRowIndex + 1, block.rowCount + 1);
+    sheetData = sheet.getDataRange().getValues();
+
+    const insertionRowIndex = findChronologicalInsertionRowIndex(sheetData, dateKey);
+    const targetRowIndex = insertionRowIndex === null ? findAppendRowIndex(sheet, sheetData) : insertionRowIndex;
+    sheet.insertRows(targetRowIndex + 1, rawRows.length + 1);
+    writeRawBlockRows(sheet, targetRowIndex, rawRows);
+    writeSeparatorRow(sheet, targetRowIndex + rawRows.length);
+    sheetData = sheet.getDataRange().getValues();
+  }
 }
 
 function findAppendRowIndex(sheet, sheetData) {
@@ -339,7 +412,9 @@ function repaintLocalSupplementalWorkoutsSeparators(sheet, sheetData) {
   return sheet.getDataRange().getValues();
 }
 
-function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
+function updateSupplementalWorkoutsSheet(spreadsheet, activities, options = {}) {
+  const manualDateKeys = options.manualDateKeys || {};
+  const earliestEditableDateKey = options.earliestEditableDateKey || null;
   const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME)
     || spreadsheet.insertSheet(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
   let sheetData = ensureSupplementalWorkoutsHeader(sheet, sheet.getDataRange().getValues());
@@ -356,12 +431,18 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
 
     const activityDate = parseActivityDate(activity);
     const dateKey = getDateKey(activityDate);
+
+    // Days before the sync window belong to the historical log and are never rewritten.
+    if (earliestEditableDateKey && dateKey < earliestEditableDateKey) return;
+
     const groups = groupExercisesByCategory(exercises);
     const daySignature = buildDaySignature(dateKey, groups);
 
     const existingBlock = findDayBlock(sheetData, dateKey);
     if (existingBlock) {
       if (isNonRunningDayBlock(sheetData, existingBlock)) return;
+      // No run that day means these rows were typed in by hand, so leave them alone.
+      if (manualDateKeys[dateKey]) return;
 
       const existingSignature = buildDaySignature(dateKey, getBlockGroups(sheetData, existingBlock));
       if (existingSignature === daySignature) return;
@@ -390,7 +471,7 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
     sheetData = sheet.getDataRange().getValues();
   });
 
-  sortDayBlocksIfNeeded(sheet, sheetData);
+  sortDayBlocksIfNeeded(sheet, sheetData, earliestEditableDateKey);
   sheetData = sheet.getDataRange().getValues();
   if (isLocalSupplementalWorkoutsEnvironment()) {
     sheetData = repaintLocalSupplementalWorkoutsSeparators(sheet, sheetData);
@@ -429,6 +510,66 @@ function updateSupplementalWorkoutsSheet(spreadsheet, activities) {
   sheet.setColumnWidth(6, 150);
   sheet.setColumnWidth(7, 220);
   if (isLocalSupplementalWorkoutsEnvironment()) ensureFinalSeparatorRow(sheet);
+}
+
+// Collects the Workout column categories logged for each day, keyed by date. Rows that only
+// continue the day/category above them (blank Date/Workout cells, or cells hidden by a merge)
+// inherit the most recent values seen above.
+function getSupplementalWorkoutCategoriesByDate(sheetData) {
+  const categoriesByDate = {};
+  let currentDateKey = null;
+
+  for (let rowIndex = 1; rowIndex < sheetData.length; rowIndex++) {
+    const row = sheetData[rowIndex];
+    if (isBlankRow(row)) continue;
+
+    const rowDate = parseSheetDate(row[0]);
+    if (rowDate) currentDateKey = getDateKey(rowDate);
+    if (!currentDateKey) continue;
+
+    const category = String(row[1] || '').replace(/\u00A0/g, ' ').trim();
+    if (!category) continue;
+
+    if (!categoriesByDate[currentDateKey]) categoriesByDate[currentDateKey] = [];
+    if (!categoriesByDate[currentDateKey].some(existing => existing.toLowerCase() === category.toLowerCase())) {
+      categoriesByDate[currentDateKey].push(category);
+    }
+  }
+
+  return categoriesByDate;
+}
+
+function appendSupplementalWorkoutLines(existingValue, categories) {
+  const originalValue = splitCellLines(existingValue).join('\n');
+  const updatedValue = appendMissingCellLines(originalValue === '' ? 'Rest' : originalValue, categories);
+
+  return updatedValue === originalValue ? null : updatedValue;
+}
+
+// Second pass over the week: anything logged on the Supplemental Workouts sheet (including rows
+// entered by hand on rest days, which no Strava activity covers) is appended to its Actual Runs cell.
+function applySupplementalWorkoutsToActualRuns(spreadsheet, actualSheet, rowIndex, targetMonday, todayOffset) {
+  const sheet = spreadsheet.getSheetByName(SUPPLEMENTAL_WORKOUTS_SHEET_NAME);
+  if (!sheet) return [];
+
+  const categoriesByDate = getSupplementalWorkoutCategoriesByDate(sheet.getDataRange().getValues());
+  const weekDates = getWeekDates(targetMonday);
+  const updatedDayIndexes = [];
+
+  for (let dayIndex = 0; dayIndex <= todayOffset; dayIndex++) {
+    const categories = categoriesByDate[getDateKey(weekDates[dayIndex])];
+    if (!categories || categories.length === 0) continue;
+
+    const targetCell = actualSheet.getRange(rowIndex + 1, dayIndex + 2);
+    const updatedValue = appendSupplementalWorkoutLines(targetCell.getValue(), categories);
+    if (updatedValue === null) continue;
+
+    targetCell.setValue(updatedValue);
+    if (targetCell.setFontWeight) targetCell.setFontWeight('normal');
+    updatedDayIndexes.push(dayIndex);
+  }
+
+  return updatedDayIndexes;
 }
 
 // Reapplies separator formatting to a sheet whose values came from elsewhere (e.g. pulled

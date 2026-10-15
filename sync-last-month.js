@@ -136,6 +136,7 @@ function syncLastMonth() {
   const activities = fetchStravaActivitiesSince(monthStart);
   const weekStarts = getCoveredWeekStarts(getMondayOnOrAfter(monthStart), currentMonday);
   const injuryReportSheet = getOrCreateInjuryReportSheet(spreadsheet);
+  const syncedWeeks = [];
 
   weekStarts.forEach(targetMonday => {
     const targetRowIndex = ensureActualWeekRow(actualSheet, targetMonday);
@@ -167,6 +168,12 @@ function syncLastMonth() {
     updateInjuryReportSheet(injuryReportSheet, weekActivities, targetMonday, currentDate);
     SpreadsheetApp.flush();
     updateTotalCell(actualSheet, targetRowIndex, plannedRow);
+    syncedWeeks.push({
+      targetMonday,
+      targetRowIndex,
+      todayOffset,
+      manualDateKeys: getManualEntryDateKeys(actualSheet, targetRowIndex, targetMonday, todayOffset)
+    });
   });
   boldActualRunLabels(actualSheet);
 
@@ -176,8 +183,15 @@ function syncLastMonth() {
   );
   updateSupplementalWorkoutsSheet(
     spreadsheet,
-    activities.filter(activity => parseActivityDate(activity) >= supplementalWorkoutsStart)
+    activities.filter(activity => parseActivityDate(activity) >= supplementalWorkoutsStart),
+    {
+      manualDateKeys: Object.assign({}, ...syncedWeeks.map(week => week.manualDateKeys)),
+      earliestEditableDateKey: getDateKey(weekStarts[0])
+    }
   );
+  syncedWeeks.forEach(({ targetMonday, targetRowIndex, todayOffset }) => {
+    applySupplementalWorkoutsToActualRuns(spreadsheet, actualSheet, targetRowIndex, targetMonday, todayOffset);
+  });
   SpreadsheetApp.flush();
 
   const changes = (globalThis.__localSheetsMock || sheetsMock).save();

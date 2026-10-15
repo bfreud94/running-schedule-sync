@@ -12,7 +12,7 @@ function loadContext() {
     getDateKey: date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
     parseSheetDate: value => value instanceof Date ? value : null
   });
-  const source = `${readFileSync('DateUtils.js', 'utf8')}\n${readFileSync('SupplementalWorkouts.js', 'utf8')}`;
+  const source = `${readFileSync('DateUtils.js', 'utf8')}\n${readFileSync('SheetUtils.js', 'utf8')}\n${readFileSync('SupplementalWorkouts.js', 'utf8')}`;
   vm.runInContext(source, context);
   return context;
 }
@@ -451,6 +451,7 @@ test('preserves a manually entered Non Running Day block instead of overwriting 
       readFileSync('DateUtils.js', 'utf8'),
       readFileSync('RunningMetrics.js', 'utf8'),
       readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SheetUtils.js', 'utf8'),
       readFileSync('SupplementalWorkouts.js', 'utf8')
     ].join('\n');
     vm.runInContext(source, context);
@@ -490,6 +491,7 @@ test('overwrites a day already recorded when its exercises change', () => {
         readFileSync('DateUtils.js', 'utf8'),
         readFileSync('RunningMetrics.js', 'utf8'),
         readFileSync('InjuryReport.js', 'utf8'),
+        readFileSync('SheetUtils.js', 'utf8'),
         readFileSync('SupplementalWorkouts.js', 'utf8')
       ].join('\n');
       vm.runInContext(source, context);
@@ -497,6 +499,7 @@ test('overwrites a day already recorded when its exercises change', () => {
         'updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), globalThis.__activities)',
         Object.assign(context, { __activities: [{
           start_date_local: '2026-09-16T13:00:00Z',
+          type: 'Run',
           description
         }] })
       );
@@ -533,6 +536,7 @@ test('keeps day blocks in chronological order even when activities arrive out of
         readFileSync('DateUtils.js', 'utf8'),
         readFileSync('RunningMetrics.js', 'utf8'),
         readFileSync('InjuryReport.js', 'utf8'),
+        readFileSync('SheetUtils.js', 'utf8'),
         readFileSync('SupplementalWorkouts.js', 'utf8')
       ].join('\n');
       vm.runInContext(source, context);
@@ -589,6 +593,7 @@ test('re-sorts an already out-of-order sheet even with no new activities', () =>
       readFileSync('DateUtils.js', 'utf8'),
       readFileSync('RunningMetrics.js', 'utf8'),
       readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SheetUtils.js', 'utf8'),
       readFileSync('SupplementalWorkouts.js', 'utf8')
     ].join('\n');
     vm.runInContext(source, context);
@@ -597,9 +602,366 @@ test('re-sorts an already out-of-order sheet even with no new activities', () =>
 
     const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
     const values = saved.sheets['Supplemental Workouts'].values;
+    // Blocks already in position keep their original cells, so assert chronology rather than the
+    // display text that `normalizeSheetDateColumn` produces in Sheets.
     const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
-    assert.deepEqual(dateCells, ['September 15', 'September 17']);
+    assert.deepEqual(dateCells.map(value => new Date(value).getDate()), [15, 17]);
   } finally {
     rmSync(tempDir, { recursive: true, force: true });
   }
+});
+
+function loadSupplementalActualRunsContext(mock) {
+  const context = vm.createContext({ console, SpreadsheetApp: mock.SpreadsheetApp });
+  const source = [
+    readFileSync('DateUtils.js', 'utf8'),
+    readFileSync('RunningMetrics.js', 'utf8'),
+    readFileSync('InjuryReport.js', 'utf8'),
+    readFileSync('SheetUtils.js', 'utf8'),
+    readFileSync('SupplementalWorkouts.js', 'utf8')
+  ].join('\n');
+  vm.runInContext(source, context);
+  return context;
+}
+
+function runSupplementalActualRunsSync(fixtureSheets, todayOffset = 6) {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-actual-runs-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+  writeFileSync(fixturePath, JSON.stringify({ sheets: fixtureSheets }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = loadSupplementalActualRunsContext(mock);
+    context.todayOffset = todayOffset;
+    vm.runInContext(`
+      const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      globalThis.updatedDayIndexes = applySupplementalWorkoutsToActualRuns(
+        spreadsheet,
+        spreadsheet.getSheetByName('Actual Runs'),
+        1,
+        new Date(2026, 9, 12),
+        todayOffset
+      );
+    `, context);
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    return { values: saved.sheets['Actual Runs'].values, updatedDayIndexes: context.updatedDayIndexes };
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+const SUPPLEMENTAL_ACTUAL_RUNS_HEADER = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Total Mileage'];
+
+test('appends a rest day supplemental workout to its Actual Runs cell', () => {
+  const { values, updatedDayIndexes } = runSupplementalActualRunsSync({
+    'Actual Runs': {
+      values: [
+        SUPPLEMENTAL_ACTUAL_RUNS_HEADER,
+        ['WEEK 24 (10/12)', '4.15 miles', '5.78 miles', 'Rest', '', '', '', '', '9.93 miles']
+      ]
+    },
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-14T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', '90 lbs', 'Non Running Day'],
+        []
+      ]
+    }
+  }, 2);
+
+  assert.deepEqual(Array.from(updatedDayIndexes), [2]);
+  assert.equal(values[1][3], 'Rest\nUpper Body Lift');
+});
+
+test('appends every logged category for a day in sheet order', () => {
+  const { values } = runSupplementalActualRunsSync({
+    'Actual Runs': {
+      values: [
+        SUPPLEMENTAL_ACTUAL_RUNS_HEADER,
+        ['WEEK 24 (10/12)', '', 'Rest', '', '', '', '', '', '']
+      ]
+    },
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-13T04:00:00.000Z', 'Shoulder Rehab', 'No Money', '2', '15', 'N/A', ''],
+        ['', '', 'Cable External Rotation', '1', '15', 'N/A', 'Each side'],
+        ['2026-10-13T04:00:00.000Z', 'Accessory Exercises', 'Leg Lifts on Back', '2', '10', 'N/A', ''],
+        ['2026-10-13T04:00:00.000Z', 'Lower Body Lift', 'Copenhagen Planks', '3', '30 seconds', 'N/A', ''],
+        []
+      ]
+    }
+  });
+
+  assert.equal(values[1][2], 'Rest\nShoulder Rehab\nAccessory Exercises\nLower Body Lift');
+});
+
+test('leaves mileage and existing workout lines intact while adding only missing categories', () => {
+  const { values, updatedDayIndexes } = runSupplementalActualRunsSync({
+    'Actual Runs': {
+      values: [
+        SUPPLEMENTAL_ACTUAL_RUNS_HEADER,
+        ['WEEK 24 (10/12)', '', '5.78 miles\nShoulder Rehab', '', '', '', '', '', '']
+      ]
+    },
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-13T04:00:00.000Z', 'Shoulder Rehab', 'No Money', '2', '15', 'N/A', ''],
+        ['2026-10-13T04:00:00.000Z', 'Core', "Captain's Chair Leg Raise", '2', '10', 'N/A', ''],
+        []
+      ]
+    }
+  });
+
+  assert.deepEqual(Array.from(updatedDayIndexes), [1]);
+  assert.equal(values[1][2], '5.78 miles\nShoulder Rehab\nCore');
+});
+
+test('does not rewrite a cell that already lists every logged category', () => {
+  const { values, updatedDayIndexes } = runSupplementalActualRunsSync({
+    'Actual Runs': {
+      values: [
+        SUPPLEMENTAL_ACTUAL_RUNS_HEADER,
+        ['WEEK 24 (10/12)', '', '5.78 miles\nShoulder Rehab', '', '', '', '', '', '']
+      ]
+    },
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-13T04:00:00.000Z', 'Shoulder Rehab', 'No Money', '2', '15', 'N/A', ''],
+        []
+      ]
+    }
+  });
+
+  assert.deepEqual(Array.from(updatedDayIndexes), []);
+  assert.equal(values[1][2], '5.78 miles\nShoulder Rehab');
+});
+
+test('ignores supplemental workouts logged after the current day of the week', () => {
+  const { updatedDayIndexes } = runSupplementalActualRunsSync({
+    'Actual Runs': {
+      values: [
+        SUPPLEMENTAL_ACTUAL_RUNS_HEADER,
+        ['WEEK 24 (10/12)', '', '', '', '', '', '', '', '']
+      ]
+    },
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-16T04:00:00.000Z', 'Core', 'Ab Wheel', '2', '6', 'N/A', ''],
+        []
+      ]
+    }
+  }, 2);
+
+  assert.deepEqual(Array.from(updatedDayIndexes), []);
+});
+
+function runSupplementalSheetSync(fixtureSheets, activities, options = {}, { production = false } = {}) {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'supplemental-manual-'));
+  const fixturePath = path.join(tempDir, 'spreadsheet.json');
+  const outputPath = path.join(tempDir, 'output.json');
+  writeFileSync(fixturePath, JSON.stringify({ sheets: fixtureSheets }));
+
+  try {
+    const mock = createGoogleSheetsMock(fixturePath, outputPath);
+    const context = vm.createContext({
+      console,
+      SpreadsheetApp: mock.SpreadsheetApp,
+      __activities: activities,
+      __options: options,
+      // Presence of PropertiesService is how the script detects it is running in production,
+      // which selects a different pruning/separator branch than the local harness.
+      ...(production
+        ? { PropertiesService: { getScriptProperties: () => ({ getProperty: () => '', setProperty: () => {} }) } }
+        : {})
+    });
+    const source = [
+      readFileSync('DateUtils.js', 'utf8'),
+      readFileSync('RunningMetrics.js', 'utf8'),
+      readFileSync('InjuryReport.js', 'utf8'),
+      readFileSync('SheetUtils.js', 'utf8'),
+      readFileSync('SupplementalWorkouts.js', 'utf8')
+    ].join('\n');
+    vm.runInContext(source, context);
+    vm.runInContext(
+      'updateSupplementalWorkoutsSheet(SpreadsheetApp.getActiveSpreadsheet(), globalThis.__activities, globalThis.__options)',
+      context
+    );
+    mock.save();
+
+    const saved = JSON.parse(readFileSync(outputPath, 'utf8'));
+    return saved.sheets['Supplemental Workouts'].values;
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+// Values pulled from the live sheet arrive with trailing empty cells and the trailing separator
+// row trimmed off, and with no merge metadata, so the manual block must survive that shape too.
+const PULLED_MANUAL_ENTRY_SHEET = () => ({
+  'Supplemental Workouts': {
+    values: [
+      ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+      [],
+      ['2026-10-13T04:00:00.000Z', 'Lower Body Lift', 'Copenhagen Planks', '3', '30 seconds', 'N/A', 'Each side'],
+      [],
+      ['2026-10-14T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8\n8\n6', '90 lbs\n95 lbs\n100 lbs'],
+      ['', '', 'Dumbell Rows', '3', '8\n8\n8', '25 lbs\n30 lbs\n35 lbs']
+    ],
+    mergedRanges: []
+  }
+});
+
+[false, true].forEach(production => {
+  const environment = production ? 'production' : 'local';
+
+  test(`preserves a pulled rest day manual entry in ${environment}`, () => {
+    const values = runSupplementalSheetSync(
+      PULLED_MANUAL_ENTRY_SHEET(),
+      [],
+      { manualDateKeys: { '2026-10-14': true }, earliestEditableDateKey: '2026-10-12' },
+      { production }
+    );
+
+    const blockStart = values.findIndex(row => String(row?.[2]) === 'Bench Press');
+    assert.ok(blockStart !== -1, 'the manual October 14 block should still exist');
+    assert.equal(values[blockStart][1], 'Upper Body Lift');
+    assert.equal(values[blockStart][5], '90 lbs\n95 lbs\n100 lbs');
+    assert.equal(values[blockStart + 1][2], 'Dumbell Rows');
+    assert.equal(values[blockStart + 1][5], '25 lbs\n30 lbs\n35 lbs');
+  });
+
+  test(`does not duplicate or drop a pulled manual entry on a repeat ${environment} sync`, () => {
+    const first = runSupplementalSheetSync(
+      PULLED_MANUAL_ENTRY_SHEET(),
+      [],
+      { manualDateKeys: { '2026-10-14': true }, earliestEditableDateKey: '2026-10-12' },
+      { production }
+    );
+    const second = runSupplementalSheetSync(
+      { 'Supplemental Workouts': { values: first, mergedRanges: [] } },
+      [],
+      { manualDateKeys: { '2026-10-14': true }, earliestEditableDateKey: '2026-10-12' },
+      { production }
+    );
+
+    const benchRows = second.filter(row => String(row?.[2]) === 'Bench Press');
+    assert.equal(benchRows.length, 1);
+    assert.equal(benchRows[0][5], '90 lbs\n95 lbs\n100 lbs');
+  });
+});
+
+test('leaves a rest day manual entry untouched even when an activity describes it', () => {  const values = runSupplementalSheetSync({
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-14T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', 'HAND ENTERED', ''],
+        ['', '', 'Dumbell Rows', '3', '10', 'HAND ENTERED', ''],
+        []
+      ]
+    }
+  }, [{
+    start_date_local: '2026-10-14T19:10:00Z',
+    type: 'WeightTraining',
+    description: 'Supplemental Workouts:\nUpper Body Lift\n1. Bench Press (3x8, 200 lbs)'
+  }], { manualDateKeys: { '2026-10-14': true }, earliestEditableDateKey: '2026-10-12' });
+
+  const weights = values.slice(1).filter(row => row?.[2]).map(row => row[5]);
+  assert.deepEqual(weights, ['HAND ENTERED', 'HAND ENTERED']);
+});
+
+test('still overwrites a day whose Actual Runs cell shows a run', () => {
+  const values = runSupplementalSheetSync({
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-14T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', 'STALE', ''],
+        []
+      ]
+    }
+  }, [{
+    start_date_local: '2026-10-14T12:00:00Z',
+    type: 'Run',
+    distance: 8046,
+    description: 'Supplemental Workouts:\nUpper Body Lift\n1. Bench Press (3x8, 200 lbs)'
+  }], { manualDateKeys: {}, earliestEditableDateKey: '2026-10-12' });
+
+  const benchRow = values.find(row => row?.[2] === 'Bench Press');
+  assert.equal(benchRow[5], '200 lbs');
+});
+
+test('never rewrites log entries that fall before the sync window', () => {
+  const values = runSupplementalSheetSync({
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-09-17T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', 'HISTORICAL', ''],
+        []
+      ]
+    }
+  }, [{
+    start_date_local: '2026-09-17T12:00:00Z',
+    type: 'Run',
+    distance: 8046,
+    description: 'Supplemental Workouts:\nUpper Body Lift\n1. Bench Press (3x8, 999 lbs)'
+  }], { manualDateKeys: {}, earliestEditableDateKey: '2026-10-12' });
+
+  const benchRow = values.find(row => row?.[2] === 'Bench Press');
+  assert.equal(benchRow[5], 'HISTORICAL');
+});
+
+test('leaves an out-of-order block before the sync window where it is', () => {
+  const values = runSupplementalSheetSync({
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-09-20T04:00:00.000Z', 'Core', 'Planks', '1', '1:00', 'N/A', ''],
+        [],
+        ['2026-09-17T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', 'N/A', ''],
+        []
+      ]
+    }
+  }, [], { manualDateKeys: {}, earliestEditableDateKey: '2026-10-12' });
+
+  const orderedDays = values.slice(1).map(row => row?.[0]).filter(Boolean)
+    .map(value => new Date(value).getDate());
+  assert.deepEqual(orderedDays, [20, 17]);
+});
+
+test('sorts hand-entered rest day blocks into chronological order', () => {
+  const values = runSupplementalSheetSync({
+    'Supplemental Workouts': {
+      values: [
+        ['Date', 'Workout', 'Exercise', 'Sets', 'Reps/Hold Time', 'Weight', 'Notes'],
+        [],
+        ['2026-10-14T04:00:00.000Z', 'Upper Body Lift', 'Bench Press', '3', '8', '90 lbs', ''],
+        [],
+        ['2026-10-12T04:00:00.000Z', 'Core', 'Ab Wheel', '2', '6', 'N/A', ''],
+        [],
+        ['2026-10-13T04:00:00.000Z', 'Shoulder Rehab', 'No Money', '2', '15', 'N/A', ''],
+        []
+      ]
+    }
+  }, [], { manualDateKeys: { '2026-10-14': true }, earliestEditableDateKey: '2026-10-12' });
+
+  // The mock returns Date objects from another realm, so compare chronology rather than the
+  // display text that `normalizeSheetDateColumn` would produce in Sheets.
+  const dateCells = values.slice(1).map(row => row?.[0]).filter(Boolean);
+  const orderedDays = dateCells.map(value => new Date(value).getDate());
+  assert.deepEqual(orderedDays, [12, 13, 14]);
 });

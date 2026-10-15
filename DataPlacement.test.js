@@ -34,6 +34,9 @@ test('restyles existing daily cells in production when planned schedule changes'
     applyDailyCellStyles: () => { calls.push('applyDailyCellStyles'); },
     updateWorkoutSplitsSheet: () => {},
     updateSupplementalWorkoutsSheet: () => {},
+    getManualEntryDateKeys: () => ({}),
+    getDateKey: () => '2026-09-21',
+    applySupplementalWorkoutsToActualRuns: () => [],
     updateInjuryReportSheet: () => {},
     updateTotalCell: () => 6.07
   });

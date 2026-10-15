@@ -78,11 +78,13 @@ function renderSheet(name, sheet, changes) {
       const changedClass = changedCells.has(key) ? ' class="changed"' : '';
       const rowSpan = mergedCell && mergedCell.rowSpan > 1 ? ` rowspan="${mergedCell.rowSpan}"` : '';
       const columnSpan = mergedCell && mergedCell.columnSpan > 1 ? ` colspan="${mergedCell.columnSpan}"` : '';
-      return `<td${changedClass}${rowSpan}${columnSpan} style="${inlineStyle}">${renderCellContent(row?.[columnIndex])}</td>`;
+      const styleAttribute = inlineStyle ? ` style="${inlineStyle}"` : '';
+      return `<td${changedClass}${rowSpan}${columnSpan}${styleAttribute}>${renderCellContent(row?.[columnIndex])}</td>`;
     }).filter(Boolean);
 
     const rowStyle = rowHeight ? ` style="height:${rowHeight}px"` : '';
-    const rowCells = [`<th class="row-number" style="${heightStyle}">${rowIndex + 1}</th>`, ...cells];
+    const rowNumberStyle = heightStyle ? ` style="${heightStyle}"` : '';
+    const rowCells = [`<th class="row-number"${rowNumberStyle}>${rowIndex + 1}</th>`, ...cells];
     return [
       `<tr${rowStyle}>`,
       indentBlock(rowCells.join('\n'), 1),
