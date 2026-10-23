@@ -79,11 +79,11 @@ test('calculates total mileage from the current row daily cells', () => {
     '2,9': '999 miles',
     '1,2': '100 miles'
   };
-  let totalValue;
+  let totalFormula;
   const sheet = {
     getRange: (row, column) => ({
       getValue: () => values[`${row},${column}`] || '',
-      setValue: value => { if (row === 2 && column === 9) totalValue = value; },
+      setFormula: formula => { if (row === 2 && column === 9) totalFormula = formula; },
       setBackground: () => {},
       setFontColor: () => {}
     })
@@ -93,7 +93,7 @@ test('calculates total mileage from the current row daily cells', () => {
 
   vm.runInContext(`${source}\nglobalThis.totalTarget = updateTotalCell;`, context);
   assert.equal(context.totalTarget(sheet, 1, null), 25.25);
-  assert.equal(totalValue, '25.25 miles');
+  assert.equal(totalFormula, `=SUMPRODUCT(IFERROR(VALUE(REGEXEXTRACT(B2:H2, "[\\d\\.]+")))) & " miles"`);
 });
 
 test('styles existing daily values without rewriting them', () => {

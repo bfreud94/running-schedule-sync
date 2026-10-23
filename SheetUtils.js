@@ -76,7 +76,7 @@ function appendWeekRow(actualSheet, sheetData, targetMonday) {
     .setValue(weekLabel)
     .setFontWeight('bold');
 
-  // Carry the previous row's total formula forward; the local mock has no formula support.
+  // Carry the previous row's total formula forward; the local mock doesn't implement getFormula.
   const previousTotalFormula = rowIndex > 0 ? actualSheet.getRange(rowIndex, 9).getFormula?.() : '';
   if (previousTotalFormula) {
     actualSheet.getRange(rowIndex + 1, 9).setFormula(previousTotalFormula);
@@ -173,13 +173,15 @@ function applyDailyCellStyles(actualSheet, rowIndex, plannedRow, todayOffset, da
 }
 
 function updateTotalCell(actualSheet, rowIndex, plannedRow) {
-  const totalCell = actualSheet.getRange(rowIndex + 1, 9);
+  const totalRow = rowIndex + 1;
+  const totalCell = actualSheet.getRange(totalRow, 9);
   let actualTotalMiles = 0;
   for (let column = 2; column <= 8; column++) {
-    actualTotalMiles += parseMilesFromCell(actualSheet.getRange(rowIndex + 1, column).getValue());
+    actualTotalMiles += parseMilesFromCell(actualSheet.getRange(totalRow, column).getValue());
   }
   actualTotalMiles = Math.floor(actualTotalMiles * 100) / 100;
-  totalCell.setValue(`${actualTotalMiles} miles`);
+  // Sum the daily cells in the sheet itself so the total stays live if a cell is edited by hand.
+  totalCell.setFormula(`=SUMPRODUCT(IFERROR(VALUE(REGEXEXTRACT(B${totalRow}:H${totalRow}, "[\\d\\.]+")))) & " miles"`);
 
   if (plannedRow) {
     const plannedTotalMiles = parseMilesFromCell(plannedRow[8]);

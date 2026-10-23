@@ -9,6 +9,30 @@ function reviveDates(key, value) {
   return typeof value === 'string' && ISO_DATE_TIME_PATTERN.test(value) ? new Date(value) : value;
 }
 
+function columnLabelToIndex(label) {
+  return label.split('').reduce((index, letter) => index * 26 + (letter.charCodeAt(0) - 64), 0) - 1;
+}
+
+// updateTotalCell is the only code that writes a formula, always the column I SUMPRODUCT over a
+// B:H range. Evaluate that shape into the "<miles> miles" string Google Sheets would display so the
+// local preview and getValue stay accurate without a real formula engine.
+function evaluateFormula(formula, sheet) {
+  const rangeMatch = /([A-Z]+)(\d+):([A-Z]+)(\d+)/.exec(String(formula));
+  if (!rangeMatch) return formula;
+
+  const [, startColumn, startRow, endColumn, endRow] = rangeMatch;
+  const startColumnIndex = columnLabelToIndex(startColumn);
+  const endColumnIndex = columnLabelToIndex(endColumn);
+  let total = 0;
+  for (let rowNumber = Number(startRow); rowNumber <= Number(endRow); rowNumber++) {
+    const row = sheet.values[rowNumber - 1] || [];
+    for (let columnIndex = startColumnIndex; columnIndex <= endColumnIndex; columnIndex++) {
+      total += parseFloat(row[columnIndex]) || 0;
+    }
+  }
+  return `${Math.floor(total * 100) / 100} miles`;
+}
+
 function createSpreadsheetApp(workbook, changes = []) {
   function getSheet(name) {
     const sheet = workbook.sheets[name];
@@ -109,6 +133,13 @@ function createSpreadsheetApp(workbook, changes = []) {
             const previousValue = sheet.values[rowIndex][columnIndex];
             sheet.values[rowIndex][columnIndex] = value;
             changes.push({ sheet: name, row, column, property: 'value', previousValue, value });
+            return this;
+          },
+          setFormula(formula) {
+            sheet.values[rowIndex] ||= [];
+            const previousValue = sheet.values[rowIndex][columnIndex];
+            sheet.values[rowIndex][columnIndex] = evaluateFormula(formula, sheet);
+            changes.push({ sheet: name, row, column, property: 'formula', previousValue, value: formula });
             return this;
           },
           setValues(values) {
