@@ -76,7 +76,68 @@ function repaintSupplementalWorkoutsSeparators(workbook) {
   );
 }
 
-async function syncSpreadsheetTabs(tabNames) {
+function repaintActualRunsStyles(workbook) {
+  const actualSheetData = workbook.sheets?.['Actual Runs'];
+  const plannedSheetData = workbook.sheets?.['Planned Schedule'];
+  if (!actualSheetData || !plannedSheetData) return;
+
+  const { SpreadsheetApp } = createSpreadsheetApp(workbook);
+  const source = [
+    readFileSync(path.join(ROOT, 'DateUtils.js'), 'utf8'),
+    readFileSync(path.join(ROOT, 'RunningMetrics.js'), 'utf8'),
+    readFileSync(path.join(ROOT, 'SheetUtils.js'), 'utf8')
+  ].join('\n');
+  const context = vm.createContext({ console, SpreadsheetApp });
+  vm.runInContext(`${source}
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const actualSheet = spreadsheet.getSheetByName('Actual Runs');
+    const plannedSheet = spreadsheet.getSheetByName('Planned Schedule');
+    const actualData = actualSheet.getDataRange().getValues();
+    const plannedData = plannedSheet.getDataRange().getValues();
+    const currentMonday = getMostRecentMonday();
+    const currentDayOffset = Math.min(6, Math.max(0, getDayOffset(new Date(), currentMonday)));
+
+    actualData.forEach((row, rowIndex) => {
+      if (rowIndex === 0) return;
+      const weekStart = getWeekDate(row[0]);
+      if (!weekStart || weekStart > currentMonday) return;
+
+      const plannedRowIndex = findWeekRowIndex(plannedData, weekStart);
+      if (plannedRowIndex === -1) return;
+      const plannedRow = plannedData[plannedRowIndex];
+      const isCurrentWeek = areSameDate(weekStart, currentMonday);
+      const lastStyleDayIndex = isCurrentWeek ? currentDayOffset : 6;
+      applyDailyCellStyles(actualSheet, rowIndex, plannedRow, lastStyleDayIndex);
+
+      if (isCurrentWeek) {
+        for (let dayIndex = currentDayOffset + 1; dayIndex < 7; dayIndex++) {
+          applyCellStyle(actualSheet.getRange(rowIndex + 1, dayIndex + 2), {
+            background: null,
+            fontColor: null
+          });
+        }
+      }
+
+      const plannedTotalMiles = parseMilesFromCell(plannedRow[8]);
+      if (weekStart < currentMonday && plannedTotalMiles > 0) {
+        applyCellStyle(
+          actualSheet.getRange(rowIndex + 1, 9),
+          getTotalCellStyle(parseMilesFromCell(row[8]), plannedTotalMiles)
+        );
+      }
+    });
+  `, context);
+}
+
+function replaceWorkbookTab(workbook, tabName, values, preserveLocalFormatting = false) {
+  const existingSheet = workbook.sheets[tabName];
+  workbook.sheets[tabName] = preserveLocalFormatting && existingSheet
+    ? { ...existingSheet, values }
+    : { values, styles: {}, columnWidths: {}, rowHeights: {}, mergedRanges: [] };
+}
+
+async function syncSpreadsheetTabs(tabNames, options = {}) {
+  const preserveLocalFormatting = new Set(options.preserveLocalFormatting || []);
   const auth = await getAuthenticatedClient();
   const sheets = google.sheets({ version: 'v4', auth });
   const spreadsheet = await sheets.spreadsheets.get({
@@ -93,13 +154,13 @@ async function syncSpreadsheetTabs(tabNames) {
 
   for (const tabName of tabNames) {
     const values = await readSpreadsheetTab(sheets, tabName);
-    // Row counts shift between production and local, so stale styling/merges would misalign.
-    workbook.sheets[tabName] = { values, styles: {}, columnWidths: {}, rowHeights: {}, mergedRanges: [] };
+    replaceWorkbookTab(workbook, tabName, values, preserveLocalFormatting.has(tabName));
     console.log(`Synced ${values.length} ${tabName} rows from ${SPREADSHEET_NAME}.`);
   }
 
   applyLocalBoldFormatting(workbook);
   applyLocalDateFormatting(workbook);
+  if (tabNames.includes('Actual Runs')) repaintActualRunsStyles(workbook);
   if (tabNames.includes('Supplemental Workouts')) repaintSupplementalWorkoutsSeparators(workbook);
 
   const serializedWorkbook = `${JSON.stringify(workbook, null, 2)}\n`;
@@ -109,8 +170,8 @@ async function syncSpreadsheetTabs(tabNames) {
   console.log('Updated fixtures/spreadsheet.json, output/spreadsheet.json, and output/spreadsheet.html.');
 }
 
-function runSpreadsheetTabSync(tabNames) {
-  syncSpreadsheetTabs(tabNames).catch(error => {
+function runSpreadsheetTabSync(tabNames, options) {
+  syncSpreadsheetTabs(tabNames, options).catch(error => {
     console.error(error.message);
     process.exitCode = 1;
   });

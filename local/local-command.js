@@ -1,6 +1,7 @@
 const { readFileSync, writeFileSync } = require('node:fs');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
+const { syncSpreadsheetTabs } = require('./syncSpreadsheetTabs');
 
 const root = path.resolve(__dirname, '..');
 const args = process.argv.slice(2);
@@ -18,16 +19,33 @@ const childArgs = pullMode
 if (pullMode) childArgs.push(...(useMocks ? ['mocks'] : []));
 if (date && !pullMode) childArgs.push(date);
 
-const result = spawnSync(process.execPath, [path.join(root, command), ...childArgs], {
-  cwd: root,
-  stdio: 'inherit'
-});
-process.exitCode = result.status ?? 1;
-
-if (process.exitCode === 0) {
-  const outputPath = path.join(root, 'output', 'spreadsheet.json');
-  const fixturePath = path.join(root, 'fixtures', 'spreadsheet.json');
-  const workbook = JSON.parse(readFileSync(outputPath, 'utf8').replace(/^\uFEFF/, ''));
-  writeFileSync(fixturePath, `${JSON.stringify({ sheets: workbook.sheets }, null, 2)}\n`);
-  console.log('Persisted synchronized sheets to fixtures/spreadsheet.json.');
+function runNodeScript(script, scriptArgs = []) {
+  return spawnSync(process.execPath, [path.join(root, script), ...scriptArgs], {
+    cwd: root,
+    stdio: 'inherit'
+  });
 }
+
+async function main() {
+  if (!useMocks) {
+    await syncSpreadsheetTabs(['Actual Runs'], {
+      preserveLocalFormatting: ['Actual Runs']
+    });
+  }
+
+  const result = runNodeScript(command, childArgs);
+  process.exitCode = result.status ?? 1;
+
+  if (process.exitCode === 0) {
+    const outputPath = path.join(root, 'output', 'spreadsheet.json');
+    const fixturePath = path.join(root, 'fixtures', 'spreadsheet.json');
+    const workbook = JSON.parse(readFileSync(outputPath, 'utf8').replace(/^\uFEFF/, ''));
+    writeFileSync(fixturePath, `${JSON.stringify({ sheets: workbook.sheets }, null, 2)}\n`);
+    console.log('Persisted synchronized sheets to fixtures/spreadsheet.json.');
+  }
+}
+
+main().catch(error => {
+  console.error(error.message);
+  process.exitCode = 1;
+});

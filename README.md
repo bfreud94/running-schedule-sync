@@ -126,7 +126,7 @@ always shows a color per cell rather than coloring the whole row by the worst in
 
 ```powershell
 npm test           # run the unit tests (node --test)
-npm run local       # live Strava, since the most recent Monday
+npm run local       # refresh Actual Runs, then sync live Strava since the most recent Monday
 npm run local -- 2026-09-01 # live Strava, since the supplied date
 npm run local -- 2026-09-01 mocks # local mocks, since the supplied date
 npm run local -- pull 2026-09-01 # pull Strava, save mocks, then update spreadsheet.json
@@ -149,13 +149,15 @@ rest-day scenarios through the production branch, with a mock that enforces Goog
 merged-cell rules — writing a range that splits a merged region throws, and a merged region reads
 back only through its top-left cell.
 
-`npm run local` executes the script in Node using `local/GoogleSheetsMock.js` in place of
-`SpreadsheetApp`, and `curl` in place of `UrlFetchApp`, writing the resulting sheet state to
-`output/spreadsheet.json` (and `output/spreadsheet.html` for a visual preview). Strava credentials
-for live runs are read from a `.env` file (`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`,
-`STRAVA_REFRESH_TOKEN`); when deployed, the same keys are read from Apps Script's
-`PropertiesService` script properties instead. Add the positional word `mocks` to use files from
-`local/mocks/` instead of contacting Strava.
+`npm run local` first refreshes **Actual Runs** from the production spreadsheet so completed prior
+weeks cannot be replaced by stale fixture data. It then executes the script in Node using
+`local/GoogleSheetsMock.js` in place of `SpreadsheetApp`, and `curl` in place of `UrlFetchApp`,
+writing the resulting sheet state to `output/spreadsheet.json` (and `output/spreadsheet.html` for a
+visual preview). Strava credentials for live runs are read from a `.env` file
+(`STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET`, `STRAVA_REFRESH_TOKEN`); when deployed, the same keys
+are read from Apps Script's `PropertiesService` script properties instead. Add the positional word
+`mocks` to use files from `local/mocks/` instead of contacting Strava; mock runs remain offline and
+use the existing fixture.
 
 `npm run local -- pull 2026-09-01` runs the pull and local spreadsheet sync sequentially. It saves
 each running activity under `local/mocks/` and then writes the complete local workbook to
