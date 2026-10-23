@@ -124,9 +124,11 @@ function getDailyCellStyle(plannedValue, actualMiles) {
   return { background: COLORS.red, fontColor: COLORS.white };
 }
 
+// The weekly total is judged by how far it drifts from the plan as a percentage, not absolute
+// miles: within 5% is green, 5-10% is yellow, and more than 10% off is red.
 function getTotalCellStyle(actualMiles, plannedMiles) {
   const percentageDifference = Math.abs((actualMiles - plannedMiles) / plannedMiles);
-  if (percentageDifference <= 0.03) return { background: COLORS.green, fontColor: COLORS.white };
+  if (percentageDifference <= 0.05) return { background: COLORS.green, fontColor: COLORS.white };
   if (percentageDifference <= 0.10) return { background: COLORS.yellow, fontColor: null };
   return { background: COLORS.red, fontColor: COLORS.white };
 }

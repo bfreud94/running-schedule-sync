@@ -117,6 +117,27 @@ test('styles existing daily values without rewriting them', () => {
   ]);
 });
 
+test('colors the weekly total by percentage off the planned total', () => {
+  const context = vm.createContext({ console });
+  const source = readFileSync('SheetUtils.js', 'utf8');
+
+  vm.runInContext(`${source}\nglobalThis.totalStyleTarget = getTotalCellStyle;`, context);
+
+  const green = { background: '#34a853', fontColor: '#ffffff' };
+  const yellow = { background: 'yellow', fontColor: null };
+  const red = { background: 'red', fontColor: '#ffffff' };
+
+  // 4% off is green now that the green band runs to 5% (it was yellow under the old 3% cutoff).
+  assert.deepEqual({ ...context.totalStyleTarget(48, 50) }, green);
+  // Exactly 5% off is still within the green band.
+  assert.deepEqual({ ...context.totalStyleTarget(47.5, 50) }, green);
+  // Between 5% and 10% off is yellow/black, over or under the target.
+  assert.deepEqual({ ...context.totalStyleTarget(47, 50) }, yellow);
+  assert.deepEqual({ ...context.totalStyleTarget(55, 50) }, yellow);
+  // More than 10% off is red/white.
+  assert.deepEqual({ ...context.totalStyleTarget(44, 50) }, red);
+});
+
 test('finds the planned row by week instead of row position', () => {
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');
