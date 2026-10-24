@@ -138,6 +138,27 @@ test('colors the weekly total by percentage off the planned total', () => {
   assert.deepEqual({ ...context.totalStyleTarget(44, 50) }, red);
 });
 
+test('colors each daily run by absolute miles off the plan', () => {
+  const context = vm.createContext({ console });
+  const source = `${readFileSync('RunningMetrics.js', 'utf8')}\n${readFileSync('SheetUtils.js', 'utf8')}`;
+
+  vm.runInContext(`${source}\nglobalThis.dailyStyleTarget = getDailyCellStyle;`, context);
+
+  const green = { background: '#34a853', fontColor: '#ffffff' };
+  const yellow = { background: 'yellow', fontColor: null };
+  const red = { background: 'red', fontColor: '#ffffff' };
+
+  // 0.4 mile off is green now that the green band runs to 1/2 mile (it was yellow under 1/4 mile).
+  assert.deepEqual({ ...context.dailyStyleTarget('10 miles', 10.4) }, green);
+  // Exactly 1/2 mile off is still within the green band.
+  assert.deepEqual({ ...context.dailyStyleTarget('10 miles', 10.5) }, green);
+  // 1/2 to 1 mile off is yellow/black (0.75 was red under the old 1/2 mile cutoff).
+  assert.deepEqual({ ...context.dailyStyleTarget('10 miles', 10.75) }, yellow);
+  assert.deepEqual({ ...context.dailyStyleTarget('10 miles', 11) }, yellow);
+  // More than 1 mile off is red/white.
+  assert.deepEqual({ ...context.dailyStyleTarget('10 miles', 11.5) }, red);
+});
+
 test('finds the planned row by week instead of row position', () => {
   const context = vm.createContext({ console });
   const dateSource = readFileSync('DateUtils.js', 'utf8');

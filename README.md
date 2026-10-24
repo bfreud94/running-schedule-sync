@@ -20,7 +20,7 @@ meant to be run on a time-driven trigger (e.g. daily). Each run:
 1. Finds the current week's row in **Actual Runs** (and the matching row in **Planned Schedule**).
 2. Fetches all Strava activities since that Monday, including each activity's full description.
 3. Updates the daily cells in **Actual Runs** with mileage and any parsed workout text, color-coded
-   against the plan.
+   against the plan (within 1/2 mile green, 1/2–1 mile yellow, more than 1 mile red).
 4. Updates the weekly total cell's color based on what percentage actual miles are off the planned
    total (within 5% green, 5–10% yellow, more than 10% red).
 5. Appends any workout splits found in activity descriptions to **Workout Splits**.

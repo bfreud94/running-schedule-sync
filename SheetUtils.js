@@ -119,8 +119,10 @@ function getDailyCellStyle(plannedValue, actualMiles) {
   }
 
   const difference = Math.abs(actualMiles - parseMilesFromCell(plannedValue));
-  if (difference <= 0.25) return { background: COLORS.green, fontColor: COLORS.white };
-  if (difference <= 0.50) return { background: COLORS.yellow, fontColor: null };
+  // Daily cells are judged by absolute miles off the plan: within 1/2 mile is green, 1/2 to 1 mile
+  // is yellow, and more than 1 mile off is red.
+  if (difference <= 0.50) return { background: COLORS.green, fontColor: COLORS.white };
+  if (difference <= 1.00) return { background: COLORS.yellow, fontColor: null };
   return { background: COLORS.red, fontColor: COLORS.white };
 }
 
